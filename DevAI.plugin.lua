@@ -625,6 +625,18 @@ local PRESETS = {
 		signup  = "console.groq.com/keys",
 		note    = "Very fast, generous free tier.",
 	},
+	["Kimi/K2.7-Code"] = {
+		baseUrl = "https://api.moonshot.cn/v1",
+		model   = "kimi-k2.7-code",
+		signup  = "platform.kimi.ai",
+		note    = "Moonshot Kimi — strong at coding, 256k context. Paid, $1 min top-up.",
+	},
+	["Kimi/K3"] = {
+		baseUrl = "https://api.moonshot.cn/v1",
+		model   = "kimi-k3",
+		signup  = "platform.kimi.ai",
+		note    = "Moonshot Kimi K3 — flagship, 1M-token context. Paid ($3/$15 per MTok).",
+	},
 	["Ollama (local)"] = {
 		baseUrl = "http://localhost:11434/v1",
 		model   = "llama3.1",

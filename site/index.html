@@ -421,12 +421,14 @@ iframe.model-viewer { width:100%; height:400px; border:none; border-radius:8px; 
         <h3 style="color:var(--gold-light); margin-top:0;">LLM (Chat / Code / GUI)</h3>
         <label>Provider preset</label>
         <select id="setPreset">
-          <option value="https://openrouter.ai/api/v1|openrouter/auto">OpenRouter (Auto)</option>
-          <option value="https://openrouter.ai/api/v1|meta-llama/llama-3.1-8b-instruct:free">OpenRouter-Free (Llama 3.1 8B)</option>
+          <option value="https://openrouter.ai/api/v1|openrouter/auto">OpenRouter (Auto-router)</option>
+          <option value="https://openrouter.ai/api/v1|meta-llama/llama-3.1-8b-instruct:free">OpenRouter-Free (Llama 3.1 8B) — default, 100% free</option>
           <option value="https://openrouter.ai/api/v1|anthropic/claude-3.5-sonnet">OpenRouter — Claude 3.5 Sonnet</option>
           <option value="https://openrouter.ai/api/v1|openai/gpt-4o-mini">OpenRouter — GPT-4o-mini</option>
-          <option value="https://api.groq.com/openai/v1|llama-3.3-70b-versatile">Groq — Llama 3.3 70B</option>
+          <option value="https://api.groq.com/openai/v1|llama-3.3-70b-versatile">Groq — Llama 3.3 70B (fast)</option>
           <option value="https://api.openai.com/v1|gpt-4o-mini">OpenAI direct — GPT-4o-mini</option>
+          <option value="https://api.moonshot.cn/v1|kimi-k2.7-code">Moonshot Kimi — K2.7 Code (paid, strong at Luau, 256k ctx)</option>
+          <option value="https://api.moonshot.cn/v1|kimi-k3">Moonshot Kimi — K3 (paid, 1M-token context, flagship)</option>
           <option value="http://localhost:11434/v1|llama3.1">Ollama (local)</option>
           <option value="custom">Custom…</option>
         </select>
