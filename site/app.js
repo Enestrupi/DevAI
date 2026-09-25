@@ -2,6 +2,47 @@
 // All state lives in localStorage. All provider calls go directly from the browser.
 
 const $ = (id) => document.getElementById(id);
+
+// Provider preset metadata. The dropdown value in HTML must match url|model here.
+const PRESETS = {
+  'https://openrouter.ai/api/v1|openrouter/auto': {
+    label:'OpenRouter (Auto-router)', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
+    free:false, note:'Picks the best model per request. Pay-as-you-go, one key for Claude/GPT/Llama/Grok/Gemini.'
+  },
+  'https://openrouter.ai/api/v1|meta-llama/llama-3.1-8b-instruct:free': {
+    label:'OpenRouter-Free (Llama 3.1 8B)', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
+    free:true, note:'Default — 100% free, no credit card, 20 requests/min. Great for scripts & debugging.'
+  },
+  'https://openrouter.ai/api/v1|anthropic/claude-3.5-sonnet': {
+    label:'OpenRouter — Claude 3.5 Sonnet', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
+    free:false, note:'Strongest all-around for Luau & system design. Pay-as-you-go.'
+  },
+  'https://openrouter.ai/api/v1|openai/gpt-4o-mini': {
+    label:'OpenRouter — GPT-4o-mini', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
+    free:false, note:'Fast & cheap. Good for quick scripts and UI generation.'
+  },
+  'https://api.groq.com/openai/v1|llama-3.3-70b-versatile': {
+    label:'Groq — Llama 3.3 70B (fast)', signup:'console.groq.com/keys', signupUrl:'https://console.groq.com/keys',
+    free:true, note:'Very fast, generous free tier. Good for short responses and chat.'
+  },
+  'https://api.openai.com/v1|gpt-4o-mini': {
+    label:'OpenAI direct — GPT-4o-mini', signup:'platform.openai.com/api-keys', signupUrl:'https://platform.openai.com/api-keys',
+    free:false, note:'OpenAI direct. Pay-as-you-go.'
+  },
+  'https://api.moonshot.cn/v1|kimi-k2.7-code': {
+    label:'Moonshot Kimi — K2.7 Code', signup:'platform.kimi.ai', signupUrl:'https://platform.kimi.ai/console',
+    free:false, paid:true, note:'Specialized coding model, 256k-token context. PAID — requires $1 minimum top-up at platform.kimi.ai.'
+  },
+  'https://api.moonshot.cn/v1|kimi-k3': {
+    label:'Moonshot Kimi — K3 (flagship)', signup:'platform.kimi.ai', signupUrl:'https://platform.kimi.ai/console',
+    free:false, paid:true, note:'Flagship reasoning model, 1M-token context (stuff your whole project in). PAID — $3/$15 per MTok, $1 min top-up.'
+  },
+  'http://localhost:11434/v1|llama3.1': {
+    label:'Ollama (local)', signup:'', signupUrl:'',
+    free:true, local:true, note:'100% offline — run Ollama locally first. API key can be anything.'
+  },
+};
+
 const state = {
   llmUrl: 'https://openrouter.ai/api/v1',
   llmModel: 'meta-llama/llama-3.1-8b-instruct:free',
@@ -460,6 +501,7 @@ function refreshSettingsUI() {
   } else {
     $('customLlm').style.display='none';
   }
+  updatePresetHint();
   // conn status
   const cs=$('connStatus');
   if (state.llmKey){
@@ -471,6 +513,21 @@ function refreshSettingsUI() {
   }
   $('chatModelLabel').textContent=state.llmKey ? state.llmModel : 'no key';
 }
+function updatePresetHint() {
+  const v=$('setPreset').value;
+  const hint=$('llmKeyHint');
+  if(v==='custom'){
+    hint.innerHTML='Custom OpenAI-compatible endpoint. Enter base URL + model below.';
+    return;
+  }
+  const p=PRESETS[v];
+  if(!p){ hint.innerHTML=''; return; }
+  const tag = p.free ? '<span style="color:var(--moss);font-weight:700;">FREE</span>'
+            : p.paid ? '<span style="color:var(--red);font-weight:700;">PAID</span>'
+            : '<span style="color:var(--amber);font-weight:700;">PAYG</span>';
+  const link = p.signupUrl ? ' Get key: <a href="'+p.signupUrl+'" target="_blank" style="color:var(--amber);">'+p.signup+'</a>.' : '';
+  hint.innerHTML = tag + ' — ' + p.note + link;
+}
 $('setPreset').addEventListener('change',()=>{
   const v=$('setPreset').value;
   if(v==='custom'){
@@ -479,8 +536,8 @@ $('setPreset').addEventListener('change',()=>{
     $('customLlm').style.display='none';
     const [url,model]=v.split('|');
     state.llmUrl=url; state.llmModel=model; save();
-    refreshSettingsUI();
   }
+  updatePresetHint();
 });
 $('saveLlm').addEventListener('click',()=>{
   state.llmKey=$('setLlmKey').value.trim();
