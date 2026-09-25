@@ -64,6 +64,10 @@ local DEFAULT_SETTINGS = {
 	model = "",                           -- overridden by preset if empty
 	maxTokens = 4096,
 	temperature = 0.3,
+	-- Meshy (3D mesh generation) key — separate from LLM key.
+	-- Get free key at https://www.meshy.ai/settings/api (200 free credits/month, no CC)
+	meshyApiKey = "",
+	meshyArtStyle = "realistic",          -- realistic | cartoon | low-poly | sculpture
 	ownerUserIds = "",
 	theme = "dark-gold",
 	systemPrompt = "",
@@ -289,6 +293,7 @@ end
 local NAV_ITEMS = {
 	{ id = "HOME",      label = "🏠  Home",       },
 	{ id = "CHAT",      label = "💬  AI Chat",    },
+	{ id = "MODELS",    label = "🧊  3D Models",  },
 	{ id = "SCANNER",   label = "🔍  Game Scanner",},
 	{ id = "SCRIPTS",   label = "📜  Scripts",    },
 	{ id = "BUILDER",   label = "🏗️  Builder",    },
@@ -750,6 +755,149 @@ function AI.testServer(cb)
 			return
 		end
 		cb(true, "✅ Connected to " .. Settings.providerPreset .. " — " .. p.model)
+	end)
+end
+
+-- =============================================================================
+-- MESHY 3D MESH GENERATION
+-- Free API: https://developer.meshy.ai  |  Free key: https://www.meshy.ai/settings/api
+-- Workflow:
+--   1. POST /openapi/v2/text-to-3d  (mode=preview)  → creates a preview task (fast, ~20s)
+--   2. Poll GET /openapi/v2/text-to-3d/{id} until status == "SUCCEEDED"
+--   3. (optional) POST mode=refine with preview_task_id to get PBR-textured high-quality mesh
+--   4. Model downloads come back as glb/obj/fbx URLs.
+-- =============================================================================
+Meshy = {}
+function Meshy.createPreview(prompt, artStyle, cb)
+	if not Settings.meshyApiKey or #Settings.meshyApiKey == 0 then
+		cb(false, "No Meshy key. Get one free at meshy.ai/settings/api (no credit card, 200 free credits/month) and paste it in Settings.")
+		return
+	end
+	artStyle = artStyle or Settings.meshyArtStyle or "realistic"
+	local body = HttpService:JSONEncode({
+		mode = "preview",
+		prompt = prompt,
+		art_style = artStyle,
+		should_remesh = true,
+		target_formats = {"glb", "obj", "fbx"},
+	})
+	task.spawn(function()
+		local ok, resp = pcall(function()
+			return HttpService:RequestAsync({
+				Url = "https://api.meshy.ai/openapi/v2/text-to-3d",
+				Method = "POST",
+				Headers = {
+					["Content-Type"] = "application/json",
+					["Authorization"] = "Bearer " .. Settings.meshyApiKey,
+				},
+				Body = body,
+			})
+		end)
+		if not ok then cb(false, "HTTP error: " .. tostring(resp)); return end
+		if not resp.Success then
+			cb(false, "Meshy error (" .. resp.StatusCode .. "): " .. resp.Body:sub(1,300))
+			return
+		end
+		local okJ, j = pcall(HttpService.JSONDecode, HttpService, resp.Body)
+		if not okJ then cb(false, "Bad JSON from Meshy."); return end
+		if j.result then
+			cb(true, j.result) -- task id
+		else
+			cb(false, "Unexpected response: " .. resp.Body:sub(1,300))
+		end
+	end)
+end
+
+function Meshy.refinePreview(previewTaskId, cb)
+	if not Settings.meshyApiKey or #Settings.meshyApiKey == 0 then
+		cb(false, "No Meshy key set."); return
+	end
+	local body = HttpService:JSONEncode({
+		mode = "refine",
+		preview_task_id = previewTaskId,
+		enable_pbr = true,
+		target_formats = {"glb", "fbx", "obj"},
+	})
+	task.spawn(function()
+		local ok, resp = pcall(function()
+			return HttpService:RequestAsync({
+				Url = "https://api.meshy.ai/openapi/v2/text-to-3d",
+				Method = "POST",
+				Headers = {
+					["Content-Type"] = "application/json",
+					["Authorization"] = "Bearer " .. Settings.meshyApiKey,
+				},
+				Body = body,
+			})
+		end)
+		if not ok then cb(false, "HTTP error: " .. tostring(resp)); return end
+		if not resp.Success then
+			cb(false, "Refine error (" .. resp.StatusCode .. "): " .. resp.Body:sub(1,300))
+			return
+		end
+		local okJ, j = pcall(HttpService.JSONDecode, HttpService, resp.Body)
+		if not okJ then cb(false, "Bad JSON."); return end
+		if j.result then cb(true, j.result) else cb(false, "No task id returned.") end
+	end)
+end
+
+function Meshy.getTask(taskId, cb)
+	task.spawn(function()
+		local ok, resp = pcall(function()
+			return HttpService:RequestAsync({
+				Url = "https://api.meshy.ai/openapi/v2/text-to-3d/" .. taskId,
+				Method = "GET",
+				Headers = { ["Authorization"] = "Bearer " .. Settings.meshyApiKey },
+			})
+		end)
+		if not ok then cb(false, "HTTP error: " .. tostring(resp)); return end
+		if not resp.Success then
+			cb(false, "Status error " .. resp.StatusCode .. ": " .. resp.Body:sub(1,200))
+			return
+		end
+		local okJ, j = pcall(HttpService.JSONDecode, HttpService, resp.Body)
+		if not okJ then cb(false, "Bad JSON."); return end
+		cb(true, j)
+	end)
+end
+
+function Meshy.pollUntilDone(taskId, onProgress, onDone, pollInterval)
+	pollInterval = pollInterval or 3
+	local function tick()
+		Meshy.getTask(taskId, function(ok, data)
+			if not ok then onDone(false, data); return end
+			local status = data.status or "UNKNOWN"
+			local progress = data.progress or 0
+			onProgress(status, progress)
+			if status == "SUCCEEDED" or status == "FAILED" or status == "EXPIRED" then
+				if status == "SUCCEEDED" then onDone(true, data) else onDone(false, status) end
+				return
+			end
+			task.delay(pollInterval, tick)
+		end)
+	end
+	tick()
+end
+
+function Meshy.testKey(cb)
+	if not Settings.meshyApiKey or #Settings.meshyApiKey == 0 then
+		cb(false, "No Meshy key."); return
+	end
+	task.spawn(function()
+		local ok, resp = pcall(function()
+			return HttpService:RequestAsync({
+				Url = "https://api.meshy.ai/openapi/v2/text-to-3d?limit=1",
+				Method = "GET",
+				Headers = { ["Authorization"] = "Bearer " .. Settings.meshyApiKey },
+			})
+		end)
+		if not ok then cb(false, "Could not reach Meshy."); return end
+		if resp.StatusCode == 401 or resp.StatusCode == 403 then
+			cb(false, "❌ Bad Meshy key (HTTP " .. resp.StatusCode .. ")")
+			return
+		end
+		if not resp.Success then cb(false, "HTTP " .. resp.StatusCode); return end
+		cb(true, "✅ Meshy connected (free tier ready)")
 	end)
 end
 
@@ -1681,6 +1829,328 @@ function rebuildExplorer()
 end
 refreshExplorerBtn.MouseButton1Click:Connect(rebuildExplorer)
 
+-- ---------- 3D MODELS PAGE ----------
+local mdlY = pageTitle(Pages.MODELS, "🧊 AI 3D Model Generator",
+	"Generate actual 3D meshes (GLB/OBJ/FBX) from text using Meshy's AI. Free tier: 200 credits/month @ meshy.ai.")
+
+-- Info banner
+local meshInfo = make(Pages.MODELS, "TextLabel", {
+	BackgroundTransparency=1,
+	Text="Describe an object and click GENERATE. The preview takes ~20 seconds. When done, click ⬇ DOWNLOAD GLB and drag the file into Workspace or into a MeshPart.MeshId after uploading.",
+	TextColor3=C.textDim, Font=Enum.Font.Gotham, TextSize=11,
+	Size=UDim2.new(1,0,0,36), Position=UDim2.new(0,0,0,mdlY),
+	TextXAlignment=Enum.TextXAlignment.Left, TextWrapped=true,
+})
+mdlY = mdlY + 44
+
+-- Prompt box
+make(Pages.MODELS, "TextLabel", {
+	BackgroundTransparency=1, Text="Prompt", TextColor3=C.text,
+	Font=Enum.Font.GothamBold, TextSize=12, Size=UDim2.new(0,120,0,22),
+	Position=UDim2.new(0,0,0,mdlY), TextXAlignment=Enum.TextXAlignment.Left,
+})
+local meshPromptBox = make(Pages.MODELS, "TextBox", {
+	BackgroundColor3=C.bg, TextColor3=C.text,
+	PlaceholderText="e.g. A weathered golden-brown stone sword with bronze hilt and glowing amber runes, fantasy game asset, centered, high detail",
+	PlaceholderColor3=C.textFaint, Font=Enum.Font.RobotoMono, TextSize=12,
+	Size=UDim2.new(1,-130,0,70), Position=UDim2.new(0,120,0,mdlY),
+	Text="", ClearTextOnFocus=false, MultiLine=true, TextWrapped=true, BorderSizePixel=0,
+})
+do local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,6); c.Parent=meshPromptBox
+   local s=Instance.new("UIStroke"); s.Color=C.border; s.Thickness=1; s.Parent=meshPromptBox
+   local pad=Instance.new("UIPadding"); pad.PaddingLeft=UDim.new(0,10); pad.PaddingTop=UDim.new(0,8); pad.Parent=meshPromptBox end
+mdlY = mdlY + 80
+
+-- Art style selector
+make(Pages.MODELS, "TextLabel", {
+	BackgroundTransparency=1, Text="Art style", TextColor3=C.text,
+	Font=Enum.Font.GothamBold, TextSize=12, Size=UDim2.new(0,120,0,28),
+	Position=UDim2.new(0,0,0,mdlY), TextXAlignment=Enum.TextXAlignment.Left,
+})
+local styleNames = {"realistic","cartoon","low-poly","sculpture"}
+local styleIdx = 1
+for i,s in ipairs(styleNames) do if s == Settings.meshyArtStyle then styleIdx = i end end
+local styleBtn = make(Pages.MODELS, "TextButton", {
+	Text = Settings.meshyArtStyle or "realistic",
+	TextColor3 = Color3.new(0,0,0), Font=Enum.Font.GothamBold, TextSize=12,
+	Size=UDim2.new(0,180,0,28), Position=UDim2.new(0,120,0,mdlY),
+	BackgroundColor3=C.bronze, BorderSizePixel=0, AutoButtonColor=true,
+})
+do local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,4); c.Parent=styleBtn end
+styleBtn.MouseButton1Click:Connect(function()
+	styleIdx = (styleIdx % #styleNames) + 1
+	local s = styleNames[styleIdx]
+	styleBtn.Text = s
+	saveSetting("meshyArtStyle", s)
+end)
+mdlY = mdlY + 38
+
+-- Generate button
+local genMeshBtn = make(Pages.MODELS, "TextButton", {
+	Text="✨ GENERATE 3D MODEL", TextColor3=Color3.new(0,0,0),
+	Font=Enum.Font.GothamBlack, TextSize=14,
+	Size=UDim2.new(0,220,0,40), Position=UDim2.new(0,0,0,mdlY),
+	BackgroundColor3=C.gold, BorderSizePixel=0, AutoButtonColor=true,
+})
+do local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,6); c.Parent=genMeshBtn end
+
+local refineBtn = make(Pages.MODELS, "TextButton", {
+	Text="🌟 REFINE (add PBR textures)", TextColor3=C.text,
+	Font=Enum.Font.GothamBold, TextSize=12,
+	Size=UDim2.new(0,240,0,40), Position=UDim2.new(0,230,0,mdlY),
+	BackgroundColor3=C.panel2, BorderSizePixel=0, AutoButtonColor=true,
+})
+do local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,6); c.Parent=refineBtn end
+refineBtn.Visible = false
+
+local statusLbl = make(Pages.MODELS, "TextLabel", {
+	BackgroundTransparency=1, Text="Ready.", TextColor3=C.textDim,
+	Font=Enum.Font.Gotham, TextSize=11, Size=UDim2.new(1,-480,0,40),
+	Position=UDim2.new(0,480,0,mdlY), TextXAlignment=Enum.TextXAlignment.Left,
+	TextWrapped=true,
+})
+mdlY = mdlY + 50
+
+-- Progress bar
+local progressBg = make(Pages.MODELS, "Frame", {
+	BackgroundColor3=C.panel2, Size=UDim2.new(1,0,0,10),
+	Position=UDim2.new(0,0,0,mdlY), BorderSizePixel=0, Visible=false,
+})
+do local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,5); c.Parent=progressBg end
+local progressFill = make(progressBg, "Frame", {
+	BackgroundColor3=C.gold, Size=UDim2.new(0,0,1,0), Position=UDim2.fromScale(0,0), BorderSizePixel=0,
+})
+do local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,5); c.Parent=progressFill end
+mdlY = mdlY + 20
+
+-- Result card
+local resultCard = make(Pages.MODELS, "Frame", {
+	BackgroundColor3=C.panel, Size=UDim2.new(1,0,0,280),
+	Position=UDim2.new(0,0,0,mdlY), BorderSizePixel=0, Visible=false,
+})
+do local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,8); c.Parent=resultCard
+   local s=Instance.new("UIStroke"); s.Color=C.border; s.Thickness=1; s.Parent=resultCard
+   local pad=Instance.new("UIPadding"); pad.PaddingLeft=UDim.new(0,14); pad.PaddingRight=UDim.new(0,14)
+   pad.PaddingTop=UDim.new(0,12); pad.PaddingBottom=UDim.new(0,12); pad.Parent=resultCard end
+make(resultCard, "TextLabel", {
+	BackgroundTransparency=1, Text="✅ Model Ready", TextColor3=C.moss,
+	Font=Enum.Font.GothamBlack, TextSize=16, Size=UDim2.new(1,0,0,24),
+	TextXAlignment=Enum.TextXAlignment.Left,
+})
+local resultInfo = make(resultCard, "TextLabel", {
+	BackgroundTransparency=1, Text="", TextColor3=C.text,
+	Font=Enum.Font.Gotham, TextSize=11, Size=UDim2.new(1,0,0,20),
+	Position=UDim2.new(0,0,0,26), TextXAlignment=Enum.TextXAlignment.Left,
+})
+-- Thumbnail
+local thumbImg = make(resultCard, "ImageLabel", {
+	BackgroundColor3=C.bg, Size=UDim2.new(0,200,0,200),
+	Position=UDim2.new(0,0,0,54), BorderSizePixel=0,
+	BackgroundTransparency=0, ScaleType=Enum.ScaleType.Fit,
+})
+do local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,6); c.Parent=thumbImg end
+-- Download buttons column
+local btnX = 220
+local dlGlb = make(resultCard, "TextButton", {
+	Text="⬇  Download GLB", TextColor3=Color3.new(0,0,0), Font=Enum.Font.GothamBold, TextSize=12,
+	Size=UDim2.new(1,-230,0,30), Position=UDim2.new(0,btnX,0,54),
+	BackgroundColor3=C.gold, BorderSizePixel=0, AutoButtonColor=true,
+})
+do local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,4); c.Parent=dlGlb end
+local dlFbx = make(resultCard, "TextButton", {
+	Text="⬇  Download FBX", TextColor3=C.text, Font=Enum.Font.GothamBold, TextSize=12,
+	Size=UDim2.new(1,-230,0,30), Position=UDim2.new(0,btnX,0,90),
+	BackgroundColor3=C.panel2, BorderSizePixel=0, AutoButtonColor=true,
+})
+do local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,4); c.Parent=dlFbx end
+local dlObj = make(resultCard, "TextButton", {
+	Text="⬇  Download OBJ", TextColor3=C.text, Font=Enum.Font.GothamBold, TextSize=12,
+	Size=UDim2.new(1,-230,0,30), Position=UDim2.new(0,btnX,0,126),
+	BackgroundColor3=C.panel2, BorderSizePixel=0, AutoButtonColor=true,
+})
+do local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,4); c.Parent=dlObj end
+local copyLinkBtn = make(resultCard, "TextButton", {
+	Text="📋 Copy GLB Link", TextColor3=C.text, Font=Enum.Font.GothamBold, TextSize=12,
+	Size=UDim2.new(1,-230,0,30), Position=UDim2.new(0,btnX,0,162),
+	BackgroundColor3=C.panel2, BorderSizePixel=0, AutoButtonColor=true,
+})
+do local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,4); c.Parent=copyLinkBtn end
+local helpLbl = make(resultCard, "TextLabel", {
+	BackgroundTransparency=1,
+	Text="To use in Roblox: download GLB → in Studio, right-click Meshes → Insert Mesh → select file → drag into Workspace as a MeshPart, or right-click Asset Manager → Bulk Import.",
+	TextColor3=C.textDim, Font=Enum.Font.Gotham, TextSize=10,
+	Size=UDim2.new(1,-230,0,60), Position=UDim2.new(0,btnX,0,200),
+	TextXAlignment=Enum.TextXAlignment.Left, TextWrapped=true,
+})
+
+-- State
+local currentTaskId = nil
+local currentModelUrls = {}
+
+local function showResult(data)
+	resultCard.Visible = true
+	currentModelUrls = data.model_urls or {}
+	-- Populate thumbnail if available
+	if data.thumbnail_url then
+		thumbImg.Image = data.thumbnail_url
+	else
+		thumbImg.Image = ""
+	end
+	resultInfo.Text = string.format("Model: %s  ·  Tris: %s  ·  Texts: %s",
+		tostring(data.id or "?"),
+		tostring(data.trigger == "preview" and "preview" or "refined"),
+		"PBR"
+	)
+	-- Enable/disable buttons based on available formats
+	dlGlb.Visible = not not currentModelUrls.glb
+	dlFbx.Visible = not not currentModelUrls.fbx
+	dlObj.Visible = not not currentModelUrls.obj
+end
+
+genMeshBtn.MouseButton1Click:Connect(function()
+	local prompt = meshPromptBox.Text
+	if #prompt < 4 then statusLbl.Text = "Enter a prompt first."; statusLbl.TextColor3 = C.red; return end
+	if not Settings.meshyApiKey or #Settings.meshyApiKey == 0 then
+		statusLbl.Text = "Add a Meshy key in Settings first (free from meshy.ai/settings/api)."
+		statusLbl.TextColor3 = C.red
+		return
+	end
+	genMeshBtn.Text = "…generating preview…"
+	genMeshBtn.BackgroundColor3 = C.panel2
+	genMeshBtn.TextColor3 = C.text
+	statusLbl.Text = "Submitting preview task…"
+	statusLbl.TextColor3 = C.amber
+	progressBg.Visible = true
+	progressFill.Size = UDim2.new(0,0,1,0)
+	resultCard.Visible = false
+	refineBtn.Visible = false
+	Meshy.createPreview(prompt, Settings.meshyArtStyle, function(ok, taskId)
+		if not ok then
+			statusLbl.Text = "❌ " .. tostring(taskId)
+			statusLbl.TextColor3 = C.red
+			progressBg.Visible = false
+			genMeshBtn.Text = "✨ GENERATE 3D MODEL"
+			genMeshBtn.BackgroundColor3 = C.gold
+			genMeshBtn.TextColor3 = Color3.new(0,0,0)
+			log("ERR", "Meshy preview: " .. tostring(taskId))
+			return
+		end
+		currentTaskId = taskId
+		log("INFO", "Meshy preview task: " .. taskId)
+		statusLbl.Text = "⏳ Meshy is generating your preview (≈20s)…"
+		statusLbl.TextColor3 = C.amber
+		Meshy.pollUntilDone(taskId,
+			function(status, progress)
+				progressFill.Size = UDim2.new(math.clamp(progress/100, 0, 1), 0, 1, 0)
+				statusLbl.Text = string.format("⏳ %s — %d%%", status, math.floor(progress or 0))
+			end,
+			function(ok, data)
+				genMeshBtn.Text = "✨ GENERATE 3D MODEL"
+				genMeshBtn.BackgroundColor3 = C.gold
+				genMeshBtn.TextColor3 = Color3.new(0,0,0)
+				progressBg.Visible = false
+				if not ok then
+					statusLbl.Text = "❌ Generation failed: " .. tostring(data)
+					statusLbl.TextColor3 = C.red
+					return
+				end
+				statusLbl.Text = "✅ Preview ready! Click REFINE for PBR textures, or download the preview GLB."
+				statusLbl.TextColor3 = C.moss
+				showResult(data)
+				refineBtn.Visible = true
+				log("OK", "Meshy preview done.")
+			end)
+	end)
+end)
+
+refineBtn.MouseButton1Click:Connect(function()
+	if not currentTaskId then return end
+	refineBtn.Text = "…refining (≈1min)…"
+	refineBtn.BackgroundColor3 = C.panel2
+	refineBtn.TextColor3 = C.text
+	statusLbl.Text = "⏳ Refining with PBR textures…"
+	statusLbl.TextColor3 = C.amber
+	progressBg.Visible = true
+	progressFill.Size = UDim2.new(0,0,1,0)
+	Meshy.refinePreview(currentTaskId, function(ok, taskId)
+		if not ok then
+			statusLbl.Text = "❌ Refine failed: " .. tostring(taskId)
+			statusLbl.TextColor3 = C.red
+			progressBg.Visible = false
+			refineBtn.Text = "🌟 REFINE (add PBR textures)"
+			refineBtn.BackgroundColor3 = C.gold
+			refineBtn.TextColor3 = Color3.new(0,0,0)
+			return
+		end
+		currentTaskId = taskId
+		Meshy.pollUntilDone(taskId,
+			function(status, progress)
+				progressFill.Size = UDim2.new(math.clamp(progress/100,0,1),0,1,0)
+				statusLbl.Text = string.format("⏳ %s — %d%%", status, math.floor(progress or 0))
+			end,
+			function(ok, data)
+				progressBg.Visible = false
+				refineBtn.Text = "🌟 REFINE (add PBR textures)"
+				refineBtn.BackgroundColor3 = C.gold
+				refineBtn.TextColor3 = Color3.new(0,0,0)
+				if not ok then
+					statusLbl.Text = "❌ Refine failed: " .. tostring(data)
+					statusLbl.TextColor3 = C.red
+					return
+				end
+				statusLbl.Text = "✅ Refined PBR model ready — download the GLB!"
+				statusLbl.TextColor3 = C.moss
+				showResult(data)
+				log("OK", "Meshy refine done.")
+			end)
+	end)
+end)
+
+-- Download helpers: Studio plugins can't write to disk directly, but we can open URLs in browser
+-- and copy links to clipboard for the user to paste.
+local function openUrl(url)
+	if not url then return end
+	-- Best-effort: set clipboard + print instructions to output window
+	setclipboard(url)
+	print("[DevAI] Download link copied to clipboard: " .. url)
+	-- Try to open in browser via StudioService:
+	pcall(function() StudioService:OpenScript(url) end)  -- no-op fallback
+	-- Some Roblox versions support:
+	pcall(function() game:GetService("BrowserService"):OpenBrowserWindow(url) end)
+end
+dlGlb.MouseButton1Click:Connect(function()
+	local url = currentModelUrls.glb
+	if url then
+		setclipboard(url)
+		statusLbl.Text = "📋 GLB link copied to clipboard. Paste into your browser to download (https://...)."
+		statusLbl.TextColor3 = C.goldLight
+		print("[DevAI] GLB download URL: " .. url)
+	end
+end)
+dlFbx.MouseButton1Click:Connect(function()
+	if currentModelUrls.fbx then
+		setclipboard(currentModelUrls.fbx)
+		statusLbl.Text = "📋 FBX link copied to clipboard."
+		statusLbl.TextColor3 = C.goldLight
+		print("[DevAI] FBX download URL: " .. currentModelUrls.fbx)
+	end
+end)
+dlObj.MouseButton1Click:Connect(function()
+	if currentModelUrls.obj then
+		setclipboard(currentModelUrls.obj)
+		statusLbl.Text = "📋 OBJ link copied to clipboard."
+		statusLbl.TextColor3 = C.goldLight
+		print("[DevAI] OBJ download URL: " .. currentModelUrls.obj)
+	end
+end)
+copyLinkBtn.MouseButton1Click:Connect(function()
+	if currentModelUrls.glb then
+		setclipboard(currentModelUrls.glb)
+		statusLbl.Text = "📋 GLB URL copied to clipboard."
+		statusLbl.TextColor3 = C.goldLight
+	end
+end)
+
 -- ---------- TESTING PAGE ----------
 local tstY = pageTitle(Pages.TESTING, "🧪 Developer Testing Lab",
 	"One-click testers for common Roblox systems. Isolated so they don't interfere with your game.")
@@ -1977,6 +2447,68 @@ y = y + 36
 
 makeSettingRow("Max Tokens", "number", "maxTokens", y, {}); y = y + 36
 makeSettingRow("Temperature", "number", "temperature", y, {}); y = y + 36
+
+-- Separator: Meshy 3D section
+make(Pages.SETTINGS, "Frame", {
+	BackgroundColor3=C.border, Size=UDim2.new(1,0,0,1),
+	Position=UDim2.new(0,0,0,y), BorderSizePixel=0,
+})
+y = y + 12
+make(Pages.SETTINGS, "TextLabel", {
+	BackgroundTransparency=1, Text="🧊 3D Models (Meshy)", TextColor3=C.goldLight,
+	Font=Enum.Font.GothamBlack, TextSize=14, Size=UDim2.new(1,0,0,22),
+	Position=UDim2.new(0,0,0,y), TextXAlignment=Enum.TextXAlignment.Left,
+})
+y = y + 26
+make(Pages.SETTINGS, "TextLabel", {
+	BackgroundTransparency=1,
+	Text="Generates actual 3D meshes (GLB/FBX/OBJ). Free at meshy.ai (200 credits/month, no credit card). Get a key at meshy.ai/settings/api.",
+	TextColor3=C.textDim, Font=Enum.Font.Gotham, TextSize=11,
+	Size=UDim2.new(1,0,0,30), Position=UDim2.new(0,0,0,y),
+	TextXAlignment=Enum.TextXAlignment.Left, TextWrapped=true,
+})
+y = y + 36
+makeSettingRow("Meshy API Key", "password", "meshyApiKey", y, {}); y = y + 36
+-- Meshy test button
+do
+	local lbl = make(Pages.SETTINGS, "TextLabel", {
+		BackgroundTransparency=1, Text="Test Meshy", TextColor3=C.text,
+		Font=Enum.Font.GothamBold, TextSize=12, Size=UDim2.new(0,220,0,28),
+		Position=UDim2.new(0,0,0,y), TextXAlignment=Enum.TextXAlignment.Left,
+	})
+	local mtestBtn = make(Pages.SETTINGS, "TextButton", {
+		Text="🔌 Test Meshy Key", TextColor3=Color3.new(0,0,0), Font=Enum.Font.GothamBold, TextSize=12,
+		Size=UDim2.new(0,170,0,28), Position=UDim2.new(0,220,0,y),
+		BackgroundColor3=C.gold, BorderSizePixel=0, AutoButtonColor=true,
+	})
+	do local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,4); c.Parent=mtestBtn end
+	local mtestLbl = make(Pages.SETTINGS, "TextLabel", {
+		BackgroundTransparency=1, Text="", TextColor3=C.textDim, Font=Enum.Font.Gotham, TextSize=11,
+		Size=UDim2.new(1,-410,0,28), Position=UDim2.new(0,400,0,y), TextXAlignment=Enum.TextXAlignment.Left,
+		TextWrapped=true,
+	})
+	mtestBtn.MouseButton1Click:Connect(function()
+		mtestBtn.Text = "…testing…"
+		mtestBtn.BackgroundColor3 = C.panel2
+		mtestBtn.TextColor3 = C.text
+		Meshy.testKey(function(ok, msg)
+			mtestBtn.Text = "🔌 Test Meshy Key"
+			mtestBtn.BackgroundColor3 = ok and C.moss or C.red
+			mtestBtn.TextColor3 = Color3.new(0,0,0)
+			mtestLbl.Text = msg
+			log(ok and "OK" or "ERR", "Meshy test: " .. msg)
+		end)
+	end)
+	y = y + 36
+end
+
+-- Separator
+make(Pages.SETTINGS, "Frame", {
+	BackgroundColor3=C.border, Size=UDim2.new(1,0,0,1),
+	Position=UDim2.new(0,0,0,y), BorderSizePixel=0,
+})
+y = y + 12
+
 makeSettingRow("Owner UserIds (comma-separated)", "text", "ownerUserIds", y, { placeholder = "123456,789012" }); y = y + 36
 
 -- Test connection row
