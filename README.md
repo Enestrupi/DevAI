@@ -24,14 +24,14 @@ The browser app is the easiest way to use DevAI. No install, no Roblox Studio re
 
 ### Run locally
 ```bash
-cd site
+cd docs
 python3 -m http.server 8080
 # open http://localhost:8080
 ```
 
 ### Deploy to GitHub Pages (free)
 1. Push this repo to GitHub.
-2. Repo **Settings → Pages** → Source = `main` branch, folder = `/site`.
+2. Repo **Settings → Pages** → Source = `main` branch, folder = `/docs`.
 3. Live at `https://<your-username>.github.io/DevAI/`.
 
 Free-tier defaults work out of the box once you add one free API key:
