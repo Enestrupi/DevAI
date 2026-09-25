@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>DevAI — Roblox Studio AI Co-Developer</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='52' font-size='52'%3E%E2%9A%94%3C/text%3E%3C/svg%3E">
+<style>
+:root {
+  --bg:#14100c; --bg2:#1c1610; --panel:#231a12; --panel2:#2c2015; --border:#4a3520;
+  --gold:#c99a3e; --gold-light:#ebbf5b; --bronze:#8a5f2a; --amber:#ff9f2c;
+  --moss:#4d7a35; --red:#c0392b; --orange:#e67e22; --yellow:#f1c40f;
+  --green:#2ecc71; --blue:#3498db; --purple:#9b59b6;
+  --text:#eadfc5; --dim:#a69470; --faint:#726144;
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html,body { height:100%; margin:0; background:var(--bg); color:var(--text); font-family:var(--font); }
+body { display:flex; flex-direction:column; overflow:hidden; }
+header {
+  display:flex; align-items:center; gap:16px; padding:10px 18px;
+  background:var(--bg2); border-bottom:1px solid var(--border);
+}
+header h1 { margin:0; font-size:20px; color:var(--gold-light); letter-spacing:1px; font-weight:900; }
+header .badge { background:var(--bronze); color:#14100c; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700; }
+header .status { margin-left:auto; font-size:12px; color:var(--dim); }
+header .status.ok { color:var(--moss); }
+header .status.err { color:var(--red); }
+.app { display:flex; flex:1; min-height:0; }
+nav {
+  width:200px; background:var(--bg2); border-right:1px solid var(--border);
+  padding:10px 8px; display:flex; flex-direction:column; gap:4px; overflow-y:auto;
+}
+nav button {
+  background:transparent; border:none; color:var(--text); padding:10px 12px; text-align:left;
+  font-size:13px; font-weight:700; border-radius:6px; cursor:pointer;
+}
+nav button:hover { background:var(--panel); }
+nav button.active { background:var(--gold); color:#14100c; }
+nav .sep { height:1px; background:var(--border); margin:8px 4px; }
+nav .foot { margin-top:auto; font-size:10px; color:var(--faint); padding:8px; line-height:1.4; }
+main { flex:1; min-width:0; position:relative; overflow:hidden; }
+.page { position:absolute; inset:0; padding:22px 28px; overflow-y:auto; display:none; }
+.page.active { display:block; }
+h2 { color:var(--gold-light); margin:0 0 4px; font-size:24px; letter-spacing:0.5px; }
+.subtitle { color:var(--dim); font-size:13px; margin:0 0 22px; }
+.card {
+  background:var(--panel); border:1px solid var(--border); border-radius:10px;
+  padding:18px; margin-bottom:14px;
+}
+.row { display:flex; gap:12px; margin-bottom:12px; align-items:flex-start; }
+label { display:block; font-weight:700; font-size:12px; color:var(--text); margin-bottom:6px; }
+input[type=text], input[type=password], input[type=number], select, textarea {
+  background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px;
+  padding:10px 12px; font-family:var(--mono); font-size:12px; width:100%;
+}
+textarea { resize:vertical; min-height:90px; }
+input:focus, textarea:focus, select:focus { outline:2px solid var(--gold); border-color:var(--gold); }
+.btn {
+  display:inline-block; background:var(--gold); color:#14100c; border:none; padding:10px 22px;
+  font-weight:900; font-size:13px; border-radius:6px; cursor:pointer; letter-spacing:0.5px;
+}
+.btn:hover { filter:brightness(1.08); }
+.btn.bronze { background:var(--bronze); }
+.btn.green { background:var(--moss); }
+.btn.red { background:var(--red); color:#fff; }
+.btn.ghost { background:var(--panel2); color:var(--text); border:1px solid var(--border); }
+.btn:disabled { opacity:0.5; cursor:not-allowed; }
+.btnrow { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.pill { display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700; background:var(--bronze); color:#14100c; margin-right:6px; }
+.msg { padding:12px 14px; border-radius:8px; margin-bottom:10px; max-width:85%; }
+.msg.user { background:var(--panel2); margin-left:auto; border:1px solid var(--gold); }
+.msg.ai { background:var(--panel); margin-right:auto; border:1px solid var(--border); }
+.msg .who { font-size:11px; font-weight:700; margin-bottom:4px; color:var(--amber); }
+.msg.user .who { color:var(--gold-light); }
+.msg pre { background:#0a0705; padding:12px; border-radius:6px; overflow-x:auto; font-size:12px;
+  border:1px solid var(--border); color:var(--moss); font-family:var(--mono); white-space:pre-wrap; }
+.msg code { background:#0a0705; padding:2px 6px; border-radius:4px; color:var(--amber); font-family:var(--mono); font-size:12px; }
+.msg .act { margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; }
+.msg .act button { font-size:11px; padding:6px 12px; }
+#chatList { display:flex; flex-direction:column; gap:2px; }
+#chatInputWrap { position:sticky; bottom:0; background:var(--bg2); padding:12px; border-top:1px solid var(--border); border-radius:0 0 10px 10px; }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+@media(max-width:900px){ .grid2,.grid3 { grid-template-columns:1fr; } }
+.status-ok { color:var(--moss); } .status-err { color:var(--red); } .status-warn { color:var(--orange); }
+.progress { background:var(--panel2); border-radius:6px; height:10px; overflow:hidden; margin:10px 0; }
+.progress > div { background:var(--gold); height:100%; width:0%; transition:width 0.3s; }
+.thumb { background:var(--bg); border-radius:8px; width:240px; height:240px; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+.thumb img { max-width:100%; max-height:100%; }
+.download-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+.download-grid a, .download-grid button {
+  display:block; padding:10px; background:var(--gold); color:#000; text-align:center;
+  border-radius:6px; text-decoration:none; font-weight:700; font-size:12px; border:none; cursor:pointer;
+}
+.download-grid a.ghost, .download-grid button.ghost { background:var(--panel2); color:var(--text); border:1px solid var(--border); }
+select { background:var(--bg); color:var(--text); }
+.tiny { font-size:11px; color:var(--faint); }
+.kbd { background:var(--panel2); padding:2px 6px; border-radius:4px; font-family:var(--mono); font-size:11px; border:1px solid var(--border); }
+.codeblock-toolbar { display:flex; gap:6px; margin-top:8px; }
+iframe.model-viewer { width:100%; height:400px; border:none; border-radius:8px; background:#000; }
+.badge-new { background:var(--moss); color:#000; }
+.toast {
+  position:fixed; bottom:20px; right:20px; background:var(--panel); border:1px solid var(--gold);
+  padding:12px 18px; border-radius:8px; color:var(--text); font-weight:700; z-index:1000;
+  animation: slide 0.2s ease-out;
+}
+@keyframes slide { from { transform:translateY(30px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚔ DevAI</h1>
+  <span class="badge badge-new">WEB v1.2</span>
+  <span id="connStatus" class="status">Connect your API keys in Settings.</span>
+</header>
+<div class="app">
+  <nav id="nav">
+    <button data-page="home" class="active">🏠 Home</button>
+    <button data-page="chat">💬 AI Chat</button>
+    <button data-page="models">🧊 3D Models</button>
+    <button data-page="thumbnails">🖼 Thumbnails</button>
+    <button data-page="gui">🎨 GUI Generator</button>
+    <button data-page="code">📜 Luau Code</button>
+    <button data-page="animations">💃 Animations</button>
+    <div class="sep"></div>
+    <button data-page="studio">🔌 Studio Sync</button>
+    <button data-page="settings">⚙ Settings</button>
+    <div class="foot">
+      DevAI is a standalone web assistant for Roblox developers.
+      Free tier: OpenRouter-Free chat (100%) + Meshy 3D (200 cred/mo).
+      Nothing leaves your browser except to the providers you configure.
+    </div>
+  </nav>
+  <main>
+    <!-- HOME -->
+    <section class="page active" id="page-home">
+      <h2>⚔ DevAI</h2>
+      <p class="subtitle">Browser-based AI co-developer for Roblox — chat, generate 3D meshes, thumbnails, GUIs, animations, and Luau. All in one place, no Studio plugin required (though there's one if you want it).</p>
+      <div class="grid2">
+        <div class="card">
+          <h3 style="color:var(--gold-light); margin-top:0;">Quick start</h3>
+          <ol style="color:var(--text); line-height:1.8; font-size:13px; padding-left:20px;">
+            <li>Open <b>⚙ Settings</b> and paste an <b>OpenRouter</b> key (free from <a href="https://openrouter.ai/keys" target="_blank" style="color:var(--amber)">openrouter.ai/keys</a>). This powers chat, code, GUI, and thumbnails.</li>
+            <li>(Optional) Paste a <b>Meshy</b> key from <a href="https://www.meshy.ai/settings/api" target="_blank" style="color:var(--amber)">meshy.ai/settings/api</a> for 3D model generation. 200 free credits/month, no credit card.</li>
+            <li>Use the tabs above to build what you need. Copy Luau code into Studio, or download GLB/PNG files and drag them into your place.</li>
+          </ol>
+        </div>
+        <div class="card">
+          <h3 style="color:var(--gold-light); margin-top:0;">What's in each tab</h3>
+          <ul style="color:var(--text); line-height:1.7; font-size:13px; padding-left:20px;">
+            <li><b>💬 Chat</b> — Roblox-specialized AI assistant. Luau-aware, knows services/Remotes/DataStores.</li>
+            <li><b>🧊 3D Models</b> — Text → GLB/FBX mesh (Meshy). Preview in 3D, download, rig with walk/run.</li>
+            <li><b>🖼 Thumbnails</b> — Generate Roblox thumbnails/icons with character/set prompts.</li>
+            <li><b>🎨 GUI</b> — Describe a menu/HUD/shop → get a Luau LocalScript that builds it.</li>
+            <li><b>📜 Luau Code</b> — Focused code generation (pick Script/LocalScript/ModuleScript, target service).</li>
+            <li><b>💃 Animations</b> — Generate AnimationController scripts + list of IDs; rig humanoids from Meshy.</li>
+            <li><b>🔌 Studio Sync</b> — Session code to pair with the DevAI Roblox plugin (future auto-sync).</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--gold-light); margin-top:0;">Try it now</h3>
+        <div class="btnrow">
+          <button class="btn" onclick="goPage('chat')">💬 Open Chat</button>
+          <button class="btn bronze" onclick="goPage('models')">🧊 Make a 3D Model</button>
+          <button class="btn ghost" onclick="goPage('settings')">⚙ Add API Keys</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- CHAT -->
+    <section class="page" id="page-chat">
+      <h2>💬 AI Chat</h2>
+      <p class="subtitle">Ask for scripts, debug errors, plan systems. Code blocks come with a copy button and (when ready) a Send-to-Studio shortcut.</p>
+      <div class="card" style="padding:0;">
+        <div id="chatList" style="padding:16px; min-height:400px; max-height:calc(100vh - 360px); overflow-y:auto;"></div>
+        <div id="chatInputWrap">
+          <textarea id="chatInput" placeholder='e.g. "Create a round-system ModuleScript with intermission/round/end phases, using CollectionService tags and a RemoteEvent in ReplicatedStorage.Remotes."'
+            style="width:100%; min-height:70px;"></textarea>
+          <div class="btnrow">
+            <button class="btn" id="sendChat">SEND ▶</button>
+            <button class="btn ghost" id="clearChat">🧹 Clear</button>
+            <span class="tiny" style="margin-left:auto; align-self:center;">Model: <span id="chatModelLabel">—</span></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3D MODELS -->
+    <section class="page" id="page-models">
+      <h2>🧊 AI 3D Models</h2>
+      <p class="subtitle">Generate a textured GLB/FBX mesh from text. Powered by Meshy (free 200 credits/month). Requires a Meshy API key in Settings.</p>
+      <div class="card">
+        <label>Prompt</label>
+        <textarea id="meshPrompt" placeholder="A weathered golden-brown stone sword with bronze hilt and glowing amber runes, fantasy game asset, centered, high detail"></textarea>
+        <div class="row" style="margin-top:10px;">
+          <div style="flex:1;">
+            <label>Art style</label>
+            <select id="meshStyle">
+              <option value="realistic">realistic</option>
+              <option value="cartoon">cartoon</option>
+              <option value="low-poly">low-poly</option>
+              <option value="sculpture">sculpture</option>
+            </select>
+          </div>
+          <div style="flex:1;">
+            <label>Height (meters, for rig)</label>
+            <input type="number" id="meshHeight" value="1.7" step="0.1" min="0.5" max="4"/>
+          </div>
+        </div>
+        <div class="btnrow">
+          <button class="btn" id="meshGenerate">✨ GENERATE PREVIEW</button>
+          <button class="btn bronze" id="meshRefine" disabled>🌟 REFINE (PBR)</button>
+          <button class="btn green" id="meshRig" disabled>🦴 RIG + WALK/RUN</button>
+          <span id="meshStatus" class="tiny" style="align-self:center;"></span>
+        </div>
+        <div class="progress" id="meshProgress" style="display:none;"><div></div></div>
+      </div>
+      <div class="card" id="meshResult" style="display:none;">
+        <h3 style="color:var(--moss); margin-top:0;" id="meshResultTitle">✅ Model ready</h3>
+        <div class="row">
+          <div class="thumb" style="width:260px; height:260px;">
+            <img id="meshThumb" alt="preview"/>
+          </div>
+          <div style="flex:1;">
+            <div class="grid2">
+              <div>
+                <h4 style="margin:0 0 8px; color:var(--gold-light);">Mesh files</h4>
+                <div class="download-grid">
+                  <a id="dlGlb" class="ghost" target="_blank">⬇ GLB</a>
+                  <a id="dlFbx" class="ghost" target="_blank">⬇ FBX</a>
+                  <a id="dlObj" class="ghost" target="_blank">⬇ OBJ</a>
+                  <button class="ghost" id="copyGlb">📋 Copy GLB</button>
+                </div>
+              </div>
+              <div>
+                <h4 style="margin:0 0 8px; color:var(--gold-light);">Rig + Animations</h4>
+                <div class="download-grid" id="rigLinks" style="display:none;">
+                  <a id="dlRigGlb" target="_blank">🦴 Rigged GLB</a>
+                  <a id="dlRigFbx" class="ghost" target="_blank">🦴 Rigged FBX</a>
+                  <a id="dlWalk" class="ghost" target="_blank">🚶 Walk FBX</a>
+                  <a id="dlRun" class="ghost" target="_blank">🏃 Run FBX</a>
+                </div>
+                <p id="rigHint" class="tiny" style="margin-top:8px;">Click 🦴 RIG to auto-skeleton a humanoid character and generate walk/run animations (5 credits). Works best on bipedal characters facing +Z.</p>
+              </div>
+            </div>
+            <p class="tiny" style="margin-top:12px;">Tip for Roblox: download GLB → in Studio, right-click Meshes → Insert Mesh → select the file, or use Asset Manager → Bulk Import. Use the FBX with the Animation Editor plugin to retarget walk/run to R15.</p>
+          </div>
+        </div>
+        <h4 style="margin:14px 0 6px; color:var(--gold-light);">Live 3D preview</h4>
+        <model-viewer id="meshViewer" class="iframe model-viewer" camera-controls auto-rotate ar shadow-intensity="1" exposure="1" style="height:380px;background:#0a0705;border-radius:8px;" src="" alt="3D preview"></model-viewer>
+      </div>
+    </section>
+
+    <!-- THUMBNAILS -->
+    <section class="page" id="page-thumbnails">
+      <h2>🖼 Thumbnails & Icons</h2>
+      <p class="subtitle">Generate Roblox game thumbnails, icons, GFX. Uses an image-generation model through your OpenRouter key (pick a FLUX/Midjourney-style model in Settings) or any OpenAI Images-compatible endpoint.</p>
+      <div class="card">
+        <label>Scene description</label>
+        <textarea id="thumbPrompt" placeholder="A Roblox knight in golden-brown armor standing in an ancient jungle castle courtyard, volumetric god rays, moss-covered stones, cinematic, dramatic lighting, 1920x1080 thumbnail"></textarea>
+        <div class="row" style="margin-top:10px;">
+          <div style="flex:1;">
+            <label>Style</label>
+            <select id="thumbStyle">
+              <option value="cinematic">Cinematic Blender GFX</option>
+              <option value="cartoon">Cartoon high-CTR</option>
+              <option value="icon">Game icon (512x512)</option>
+            </select>
+          </div>
+          <div style="flex:1;">
+            <label>Image endpoint</label>
+            <select id="thumbEndpoint">
+              <option value="openrouter">OpenRouter chat-to-image (use vision model)</option>
+              <option value="pollinations" selected>Pollinations (free, no key)</option>
+            </select>
+          </div>
+        </div>
+        <div class="btnrow">
+          <button class="btn" id="thumbGenerate">🎨 GENERATE</button>
+          <span id="thumbStatus" class="tiny"></span>
+        </div>
+      </div>
+      <div class="card" id="thumbResult" style="display:none;">
+        <a id="thumbLink" target="_blank"><img id="thumbImg" style="max-width:100%; border-radius:8px; border:1px solid var(--border);"/></a>
+        <div class="btnrow">
+          <a id="thumbDl" class="btn" download="thumbnail.png" target="_blank">⬇ Download PNG</a>
+          <button class="btn ghost" id="thumbCopy">📋 Copy URL</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- GUI GENERATOR -->
+    <section class="page" id="page-gui">
+      <h2>🎨 GUI Generator</h2>
+      <p class="subtitle">Describe an in-game menu/HUD/shop → get a LocalScript that builds it with matching gold-brown DevAI theme (or tell it to match your game).</p>
+      <div class="card">
+        <label>Describe your UI</label>
+        <textarea id="guiPrompt" placeholder="A medieval-themed main menu with 'Play', 'Shop', 'Settings' buttons, gold-bordered frame, amber highlight on hover, parchment background, centered on the screen."></textarea>
+        <div class="btnrow">
+          <button class="btn" id="guiGenerate">✨ GENERATE UI SCRIPT</button>
+          <span id="guiStatus" class="tiny"></span>
+        </div>
+      </div>
+      <div class="card" id="guiResult" style="display:none;">
+        <h4 style="color:var(--moss); margin-top:0;">LocalScript output</h4>
+        <pre id="guiCode" style="background:#0a0705;padding:14px;border-radius:6px;color:var(--moss);border:1px solid var(--border);font-family:var(--mono);font-size:12px;white-space:pre-wrap;max-height:500px;overflow:auto;"></pre>
+        <div class="btnrow">
+          <button class="btn" id="guiCopy">📋 Copy Luau</button>
+          <button class="btn ghost" id="guiDownload">⬇ Download .lua</button>
+        </div>
+        <p class="tiny">Put it in <span class="kbd">StarterPlayerScripts</span> as a LocalScript.</p>
+      </div>
+    </section>
+
+    <!-- CODE -->
+    <section class="page" id="page-code">
+      <h2>📜 Focused Luau Code</h2>
+      <p class="subtitle">Generate a specific script type with a target service. Good for isolated systems.</p>
+      <div class="card">
+        <div class="row">
+          <div style="flex:1;">
+            <label>Script type</label>
+            <select id="codeType">
+              <option>Script (Server)</option>
+              <option>LocalScript</option>
+              <option>ModuleScript</option>
+            </select>
+          </div>
+          <div style="flex:2;">
+            <label>Target path</label>
+            <input type="text" id="codeTarget" value="ServerScriptService.Systems"/>
+          </div>
+          <div style="flex:1;">
+            <label>Name</label>
+            <input type="text" id="codeName" value="CombatSystem"/>
+          </div>
+        </div>
+        <label style="margin-top:10px;">Description</label>
+        <textarea id="codePrompt" placeholder="A sword-combat system with left-click swing, 1.2s cooldown, damage via a RemoteEvent, server-side validation, CollectionService-tagged swords."></textarea>
+        <div class="btnrow">
+          <button class="btn" id="codeGenerate">✨ GENERATE SCRIPT</button>
+          <span id="codeStatus" class="tiny"></span>
+        </div>
+      </div>
+      <div class="card" id="codeResult" style="display:none;">
+        <h4 style="color:var(--moss); margin-top:0;" id="codeTitle">Generated Script</h4>
+        <pre id="codeBlock" style="background:#0a0705;padding:14px;border-radius:6px;color:var(--moss);border:1px solid var(--border);font-family:var(--mono);font-size:12px;white-space:pre-wrap;max-height:600px;overflow:auto;"></pre>
+        <div class="btnrow">
+          <button class="btn" id="codeCopy">📋 Copy Luau</button>
+          <button class="btn ghost" id="codeDownload">⬇ Download .lua</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ANIMATIONS -->
+    <section class="page" id="page-animations">
+      <h2>💃 Animations</h2>
+      <p class="subtitle">Generate Luau that loads & plays R15 animations from IDs, sets up an AnimationController, or hooks walk/run idle blends. The 🧊 3D Models tab can rig Meshy characters and generate walk/run FBX files you can upload to Roblox.</p>
+      <div class="grid2">
+        <div class="card">
+          <h3 style="color:var(--gold-light); margin-top:0;">Animation player script</h3>
+          <label>Animation IDs (comma-separated)</label>
+          <input type="text" id="animIds" value="rbxassetid://180426354"/>
+          <label>Humanoid location</label>
+          <input type="text" id="animParent" value="script.Parent.Humanoid"/>
+          <label>Trigger key</label>
+          <input type="text" id="animKey" value="F"/>
+          <div class="btnrow">
+            <button class="btn" id="animGen">✨ GENERATE ANIMATION SCRIPT</button>
+          </div>
+        </div>
+        <div class="card" id="animResultCard" style="display:none;">
+          <h4 style="color:var(--moss); margin-top:0;">LocalScript</h4>
+          <pre id="animCode" style="background:#0a0705;padding:12px;border-radius:6px;color:var(--moss);border:1px solid var(--border);font-family:var(--mono);font-size:11px;white-space:pre-wrap;max-height:420px;overflow:auto;"></pre>
+          <div class="btnrow">
+            <button class="btn" id="animCopy">📋 Copy</button>
+            <button class="btn ghost" id="animDownload">⬇ Download</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--gold-light); margin-top:0;">Animation ID pack (default Roblox IDs)</h3>
+        <div class="grid3" style="font-size:12px; font-family:var(--mono); color:var(--text);">
+          <div>Idle: rbxassetid://180435571</div>
+          <div>Walk: rbxassetid://180426354</div>
+          <div>Run: rbxassetid://180426354</div>
+          <div>Jump: rbxassetid://125750702</div>
+          <div>Fall: rbxassetid://180436148</div>
+          <div>Climb: rbxassetid://180436334</div>
+          <div>Sword slash: rbxassetid://522635456</div>
+          <div>Tool grip: rbxassetid://548780605</div>
+          <div>Wave: rbxassetid://128777933</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STUDIO SYNC -->
+    <section class="page" id="page-studio">
+      <h2>🔌 Studio Sync</h2>
+      <p class="subtitle">Generate a session code. In the DevAI Roblox Studio plugin → Settings, paste this code to pair. The plugin will poll for approved scripts to insert (coming in a future relay update — right now you can copy code from any tab and paste it in Studio).</p>
+      <div class="card">
+        <label>Your session code</label>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="sessionCode" readonly style="flex:1; font-size:18px; text-align:center; letter-spacing:4px; font-weight:900; color:var(--gold-light);"/>
+          <button class="btn bronze" id="genSession">🔄 New Code</button>
+          <button class="btn ghost" id="copySession">📋 Copy</button>
+        </div>
+        <p class="tiny" style="margin-top:10px;">A future DevAI update will add a Cloudflare relay so the plugin can auto-receive and apply approved scripts/images/models from this web app without copy/paste. Today, all copy-to-clipboard buttons work with the existing plugin.</p>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="page" id="page-settings">
+      <h2>⚙ Settings</h2>
+      <p class="subtitle">API keys are stored in your browser (localStorage). They never leave your browser except to the providers below.</p>
+
+      <div class="card">
+        <h3 style="color:var(--gold-light); margin-top:0;">LLM (Chat / Code / GUI)</h3>
+        <label>Provider preset</label>
+        <select id="setPreset">
+          <option value="https://openrouter.ai/api/v1|openrouter/auto">OpenRouter (Auto)</option>
+          <option value="https://openrouter.ai/api/v1|meta-llama/llama-3.1-8b-instruct:free">OpenRouter-Free (Llama 3.1 8B)</option>
+          <option value="https://openrouter.ai/api/v1|anthropic/claude-3.5-sonnet">OpenRouter — Claude 3.5 Sonnet</option>
+          <option value="https://openrouter.ai/api/v1|openai/gpt-4o-mini">OpenRouter — GPT-4o-mini</option>
+          <option value="https://api.groq.com/openai/v1|llama-3.3-70b-versatile">Groq — Llama 3.3 70B</option>
+          <option value="https://api.openai.com/v1|gpt-4o-mini">OpenAI direct — GPT-4o-mini</option>
+          <option value="http://localhost:11434/v1|llama3.1">Ollama (local)</option>
+          <option value="custom">Custom…</option>
+        </select>
+        <div id="customLlm" style="display:none; margin-top:10px;">
+          <div class="row">
+            <div style="flex:1;"><label>Base URL</label><input type="text" id="setLlmUrl" placeholder="https://api.example.com/v1"/></div>
+            <div style="flex:1;"><label>Model</label><input type="text" id="setLlmModel" placeholder="model-name"/></div>
+          </div>
+        </div>
+        <label style="margin-top:10px;">API Key</label>
+        <input type="password" id="setLlmKey" placeholder="sk-... or sk-or-v1-..."/>
+        <p class="tiny">Get a free key at <a href="https://openrouter.ai/keys" target="_blank" style="color:var(--amber);">openrouter.ai/keys</a> (choose the free Llama 3.1 model).</p>
+        <div class="btnrow">
+          <button class="btn green" id="testLlm">🔌 Test LLM</button>
+          <button class="btn" id="saveLlm">💾 Save</button>
+          <span id="llmStatus" class="tiny"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="color:var(--gold-light); margin-top:0;">3D Models (Meshy)</h3>
+        <label>API Key</label>
+        <input type="password" id="setMeshyKey" placeholder="msy_..."/>
+        <p class="tiny">Free key (200 credits/month, no CC): <a href="https://www.meshy.ai/settings/api" target="_blank" style="color:var(--amber);">meshy.ai/settings/api</a>.</p>
+        <div class="btnrow">
+          <button class="btn green" id="testMeshy">🔌 Test Meshy</button>
+          <button class="btn" id="saveMeshy">💾 Save</button>
+          <span id="meshyStatus" class="tiny"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="color:var(--gold-light); margin-top:0;">Project memory</h3>
+        <label>Game name</label><input type="text" id="setGame" placeholder="My Roblox Game"/>
+        <label>Currency</label><input type="text" id="setCurrency" placeholder="Tokens"/>
+        <label>Main UI</label><input type="text" id="setMainUI" placeholder="MainUI"/>
+        <label>Admin system</label><input type="text" id="setAdmin" placeholder="e.g. Cmdr, Adonis, custom"/>
+        <label>Extra instructions (always appended)</label>
+        <textarea id="setExtra" placeholder="Always use CollectionService tags. Prefer typed Luau. Keep remotes in ReplicatedStorage.Remotes."></textarea>
+        <div class="btnrow"><button class="btn" id="saveMemory">💾 Save project memory</button></div>
+      </div>
+
+      <div class="card">
+        <h3 style="color:var(--gold-light); margin-top:0;">Reset</h3>
+        <button class="btn red" id="resetAll">🗑 Clear all saved keys and memory</button>
+      </div>
+    </section>
+
+  </main>
+</div>
+<script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

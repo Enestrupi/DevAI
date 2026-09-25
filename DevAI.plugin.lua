@@ -901,6 +901,76 @@ function Meshy.testKey(cb)
 	end)
 end
 
+-- Humanoid auto-rigging: takes a Meshy text-to-3d task id, adds a skeleton + optional walk/run anims.
+function Meshy.rigFromTask(inputTaskId, heightMeters, cb)
+	if not Settings.meshyApiKey or #Settings.meshyApiKey == 0 then
+		cb(false, "No Meshy key set."); return
+	end
+	heightMeters = heightMeters or 1.7
+	local body = HttpService:JSONEncode({
+		input_task_id = inputTaskId,
+		height_meters = heightMeters,
+	})
+	task.spawn(function()
+		local ok, resp = pcall(function()
+			return HttpService:RequestAsync({
+				Url = "https://api.meshy.ai/openapi/v1/rigging",
+				Method = "POST",
+				Headers = {
+					["Content-Type"] = "application/json",
+					["Authorization"] = "Bearer " .. Settings.meshyApiKey,
+				},
+				Body = body,
+			})
+		end)
+		if not ok then cb(false, "HTTP error: " .. tostring(resp)); return end
+		if not resp.Success then
+			cb(false, "Rigging error (" .. resp.StatusCode .. "): " .. resp.Body:sub(1,300))
+			return
+		end
+		local okJ, j = pcall(HttpService.JSONDecode, HttpService, resp.Body)
+		if not okJ or not j.result then cb(false, "Bad response: " .. resp.Body:sub(1,300)); return end
+		cb(true, j.result)
+	end)
+end
+
+function Meshy.getRigTask(taskId, cb)
+	task.spawn(function()
+		local ok, resp = pcall(function()
+			return HttpService:RequestAsync({
+				Url = "https://api.meshy.ai/openapi/v1/rigging/" .. taskId,
+				Method = "GET",
+				Headers = { ["Authorization"] = "Bearer " .. Settings.meshyApiKey },
+			})
+		end)
+		if not ok then cb(false, "HTTP error: " .. tostring(resp)); return end
+		if not resp.Success then
+			cb(false, "Status error " .. resp.StatusCode .. ": " .. resp.Body:sub(1,200)); return
+		end
+		local okJ, j = pcall(HttpService.JSONDecode, HttpService, resp.Body)
+		if not okJ then cb(false, "Bad JSON."); return end
+		cb(true, j)
+	end)
+end
+
+function Meshy.pollRig(taskId, onProgress, onDone, pollInterval)
+	pollInterval = pollInterval or 3
+	local function tick()
+		Meshy.getRigTask(taskId, function(ok, data)
+			if not ok then onDone(false, data); return end
+			local status = data.status or "UNKNOWN"
+			local progress = data.progress or 0
+			onProgress(status, progress)
+			if status == "SUCCEEDED" or status == "FAILED" or status == "EXPIRED" then
+				if status == "SUCCEEDED" then onDone(true, data) else onDone(false, status) end
+				return
+			end
+			task.delay(pollInterval, tick)
+		end)
+	end
+	tick()
+end
+
 function AI.resetConversation()
 	AI.history = {}
 	log("INFO", "AI conversation history cleared.")
@@ -1896,12 +1966,21 @@ do local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,6); c.Parent=genM
 
 local refineBtn = make(Pages.MODELS, "TextButton", {
 	Text="🌟 REFINE (add PBR textures)", TextColor3=C.text,
-	Font=Enum.Font.GothamBold, TextSize=12,
-	Size=UDim2.new(0,240,0,40), Position=UDim2.new(0,230,0,mdlY),
+	Font=Enum.Font.GothamBold, TextSize=11,
+	Size=UDim2.new(0,170,0,40), Position=UDim2.new(0,230,0,mdlY),
 	BackgroundColor3=C.panel2, BorderSizePixel=0, AutoButtonColor=true,
 })
 do local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,6); c.Parent=refineBtn end
 refineBtn.Visible = false
+
+local rigBtn = make(Pages.MODELS, "TextButton", {
+	Text="🦴 RIG CHARACTER (add walk/run)", TextColor3=Color3.new(0,0,0),
+	Font=Enum.Font.GothamBold, TextSize=11,
+	Size=UDim2.new(0,200,0,40), Position=UDim2.new(0,410,0,mdlY),
+	BackgroundColor3=C.moss, BorderSizePixel=0, AutoButtonColor=true,
+})
+do local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,6); c.Parent=rigBtn end
+rigBtn.Visible = false
 
 local statusLbl = make(Pages.MODELS, "TextLabel", {
 	BackgroundTransparency=1, Text="Ready.", TextColor3=C.textDim,
@@ -1925,7 +2004,7 @@ mdlY = mdlY + 20
 
 -- Result card
 local resultCard = make(Pages.MODELS, "Frame", {
-	BackgroundColor3=C.panel, Size=UDim2.new(1,0,0,280),
+	BackgroundColor3=C.panel, Size=UDim2.new(1,0,0,430),
 	Position=UDim2.new(0,0,0,mdlY), BorderSizePixel=0, Visible=false,
 })
 do local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,8); c.Parent=resultCard
@@ -1979,15 +2058,93 @@ local helpLbl = make(resultCard, "TextLabel", {
 	BackgroundTransparency=1,
 	Text="To use in Roblox: download GLB → in Studio, right-click Meshes → Insert Mesh → select file → drag into Workspace as a MeshPart, or right-click Asset Manager → Bulk Import.",
 	TextColor3=C.textDim, Font=Enum.Font.Gotham, TextSize=10,
-	Size=UDim2.new(1,-230,0,60), Position=UDim2.new(0,btnX,0,200),
+	Size=UDim2.new(1,-230,0,44), Position=UDim2.new(0,btnX,0,200),
 	TextXAlignment=Enum.TextXAlignment.Left, TextWrapped=true,
+})
+
+-- Rigged/Animated section (hidden until rig succeeds)
+local rigHeader = make(resultCard, "TextLabel", {
+	BackgroundTransparency=1, Text="🦴 Rigged Character + Animations", TextColor3=C.goldLight,
+	Font=Enum.Font.GothamBlack, TextSize=13, Size=UDim2.new(1,-230,0,20),
+	Position=UDim2.new(0,btnX,0,252), TextXAlignment=Enum.TextXAlignment.Left,
+	Visible = false,
+})
+local dlRiggedGlb = make(resultCard, "TextButton", {
+	Text="🦴 Rigged Character (GLB)", TextColor3=Color3.new(0,0,0), Font=Enum.Font.GothamBold, TextSize=11,
+	Size=UDim2.new(0.5,-4,0,28), Position=UDim2.new(0,btnX,0,278),
+	BackgroundColor3=C.gold, BorderSizePixel=0, AutoButtonColor=true,
+})
+do local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,4); c.Parent=dlRiggedGlb end
+dlRiggedGlb.Visible = false
+local dlRiggedFbx = make(resultCard, "TextButton", {
+	Text="🦴 Rigged Character (FBX)", TextColor3=C.text, Font=Enum.Font.GothamBold, TextSize=11,
+	Size=UDim2.new(0.5,-4,0,28), Position=UDim2.new(0.5,110,0,278),
+	BackgroundColor3=C.panel2, BorderSizePixel=0, AutoButtonColor=true,
+})
+do local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,4); c.Parent=dlRiggedFbx end
+dlRiggedFbx.Visible = false
+
+local animWalkGlbBtn = make(resultCard, "TextButton", {
+	Text="🚶 Walk (GLB)", TextColor3=C.text, Font=Enum.Font.GothamBold, TextSize=11,
+	Size=UDim2.new(0.5,-4,0,28), Position=UDim2.new(0,btnX,0,312),
+	BackgroundColor3=C.panel2, BorderSizePixel=0, AutoButtonColor=true,
+})
+do local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,4); c.Parent=animWalkGlbBtn end
+animWalkGlbBtn.Visible = false
+local animRunGlbBtn = make(resultCard, "TextButton", {
+	Text="🏃 Run (GLB)", TextColor3=C.text, Font=Enum.Font.GothamBold, TextSize=11,
+	Size=UDim2.new(0.5,-4,0,28), Position=UDim2.new(0.5,110,0,312),
+	BackgroundColor3=C.panel2, BorderSizePixel=0, AutoButtonColor=true,
+})
+do local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,4); c.Parent=animRunGlbBtn end
+animRunGlbBtn.Visible = false
+local animWalkFbxBtn = make(resultCard, "TextButton", {
+	Text="🚶 Walk (FBX, for AnimationEditor)", TextColor3=C.text, Font=Enum.Font.GothamBold, TextSize=11,
+	Size=UDim2.new(0.5,-4,0,28), Position=UDim2.new(0,btnX,0,346),
+	BackgroundColor3=C.panel2, BorderSizePixel=0, AutoButtonColor=true,
+})
+do local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,4); c.Parent=animWalkFbxBtn end
+animWalkFbxBtn.Visible = false
+local animRunFbxBtn = make(resultCard, "TextButton", {
+	Text="🏃 Run (FBX, for AnimationEditor)", TextColor3=C.text, Font=Enum.Font.GothamBold, TextSize=11,
+	Size=UDim2.new(0.5,-4,0,28), Position=UDim2.new(0.5,110,0,346),
+	BackgroundColor3=C.panel2, BorderSizePixel=0, AutoButtonColor=true,
+})
+do local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,4); c.Parent=animRunFbxBtn end
+animRunFbxBtn.Visible = false
+
+local rigHelpLbl = make(resultCard, "TextLabel", {
+	BackgroundTransparency=1,
+	Text="Tip: In Roblox, import the FBX rig into the Animation Editor to retarget walk/run FBX animations to R15. Works best with humanoid characters facing +Z.",
+	TextColor3=C.textDim, Font=Enum.Font.Gotham, TextSize=9,
+	Size=UDim2.new(1,-230,0,32), Position=UDim2.new(0,btnX,0,382),
+	TextXAlignment=Enum.TextXAlignment.Left, TextWrapped=true,
+	Visible = false,
 })
 
 -- State
 local currentTaskId = nil
 local currentModelUrls = {}
 
-local function showResult(data)
+-- Rig state
+local currentRigUrls = {}
+local currentRigAnimUrls = {}
+local lastResultKind = "preview"
+
+local function setRigVisible(vis)
+	rigHeader.Visible = vis
+	rigHelpLbl.Visible = vis
+	dlRiggedGlb.Visible = vis
+	dlRiggedFbx.Visible = vis
+	animWalkGlbBtn.Visible = vis
+	animRunGlbBtn.Visible = vis
+	animWalkFbxBtn.Visible = vis
+	animRunFbxBtn.Visible = vis
+end
+
+local function showResult(data, kind)
+	kind = kind or lastResultKind or "preview"
+	lastResultKind = kind
 	resultCard.Visible = true
 	currentModelUrls = data.model_urls or {}
 	-- Populate thumbnail if available
@@ -1996,15 +2153,16 @@ local function showResult(data)
 	else
 		thumbImg.Image = ""
 	end
-	resultInfo.Text = string.format("Model: %s  ·  Tris: %s  ·  Texts: %s",
-		tostring(data.id or "?"),
-		tostring(data.trigger == "preview" and "preview" or "refined"),
-		"PBR"
+	resultInfo.Text = string.format("Model: %s  ·  Quality: %s  ·  PBR: %s",
+		tostring(data.id or "?"), kind, kind == "refined" and "yes" or "no"
 	)
 	-- Enable/disable buttons based on available formats
 	dlGlb.Visible = not not currentModelUrls.glb
 	dlFbx.Visible = not not currentModelUrls.fbx
 	dlObj.Visible = not not currentModelUrls.obj
+	-- Rig button enabled when we have a task id
+	rigBtn.Visible = not not currentTaskId
+	setRigVisible(false) -- hide previous rig output until new rig completes
 end
 
 genMeshBtn.MouseButton1Click:Connect(function()
@@ -2100,7 +2258,7 @@ refineBtn.MouseButton1Click:Connect(function()
 				end
 				statusLbl.Text = "✅ Refined PBR model ready — download the GLB!"
 				statusLbl.TextColor3 = C.moss
-				showResult(data)
+				showResult(data, "refined")
 				log("OK", "Meshy refine done.")
 			end)
 	end)
@@ -2149,6 +2307,87 @@ copyLinkBtn.MouseButton1Click:Connect(function()
 		statusLbl.Text = "📋 GLB URL copied to clipboard."
 		statusLbl.TextColor3 = C.goldLight
 	end
+end)
+
+-- Rig button: rig the current preview/refined task and expose walk/run
+rigBtn.MouseButton1Click:Connect(function()
+	if not currentTaskId then return end
+	rigBtn.Visible = false
+	statusLbl.Text = "🦴 Rigging humanoid + generating walk/run animations (~60–90s, 5 credits)…"
+	statusLbl.TextColor3 = C.amber
+	progressBg.Visible = true
+	progressFill.Size = UDim2.new(0,0,1,0)
+	setRigVisible(false)
+	Meshy.rigFromTask(currentTaskId, 1.7, function(ok, rigTaskId)
+		if not ok then
+			statusLbl.Text = "❌ Rig failed to start: " .. tostring(rigTaskId)
+			statusLbl.TextColor3 = C.red
+			progressBg.Visible = false
+			rigBtn.Visible = true
+			return
+		end
+		Meshy.pollRig(rigTaskId,
+			function(status, progress)
+				progressFill.Size = UDim2.new(math.clamp((progress or 0)/100,0,1),0,1,0)
+				statusLbl.Text = string.format("🦴 %s — %d%%", tostring(status), math.floor(progress or 0))
+			end,
+			function(ok2, rigData)
+				progressBg.Visible = false
+				rigBtn.Visible = true
+				if not ok2 then
+					statusLbl.Text = "❌ Rig failed: " .. tostring(rigData)
+					statusLbl.TextColor3 = C.red
+					return
+				end
+				currentRigUrls = rigData.model_urls or {}
+				-- Meshy v1 rig returns .animations.walk / .animations.run each with a .fbx (sometimes .glb too)
+				local anims = rigData.animations or {}
+				local walk = anims.walk or {}
+				local run  = anims.run or {}
+				currentRigAnimUrls = { walk=walk, run=run }
+				-- Update button visibility
+				dlRiggedGlb.Visible = not not (currentRigUrls.glb or rigData.glb)
+				dlRiggedFbx.Visible = not not (currentRigUrls.fbx or rigData.fbx)
+				animWalkGlbBtn.Visible = not not walk.glb
+				animRunGlbBtn.Visible  = not not run.glb
+				animWalkFbxBtn.Visible = not not (walk.fbx or walk.url)
+				animRunFbxBtn.Visible  = not not (run.fbx or run.url)
+				rigHeader.Visible = true
+				rigHelpLbl.Visible = true
+				statusLbl.Text = "✅ Rigged! Walk/run animation FBX links copied on click — paste in browser to download, then import into Animation Editor."
+				statusLbl.TextColor3 = C.moss
+				log("OK", "Meshy rig complete: " .. rigTaskId)
+			end)
+	end)
+end)
+
+local function riggedUrl(kind)
+	if kind == "glb" then return currentRigUrls.glb end
+	if kind == "fbx" then return currentRigUrls.fbx end
+end
+dlRiggedGlb.MouseButton1Click:Connect(function()
+	local url = currentRigUrls.glb
+	if url then setclipboard(url); print("[DevAI] Rigged GLB URL: "..url); statusLbl.Text="📋 Rigged GLB URL copied."; statusLbl.TextColor3=C.goldLight end
+end)
+dlRiggedFbx.MouseButton1Click:Connect(function()
+	local url = currentRigUrls.fbx
+	if url then setclipboard(url); print("[DevAI] Rigged FBX URL: "..url); statusLbl.Text="📋 Rigged FBX URL copied."; statusLbl.TextColor3=C.goldLight end
+end)
+animWalkGlbBtn.MouseButton1Click:Connect(function()
+	local url = (currentRigAnimUrls.walk or {}).glb
+	if url then setclipboard(url); print("[DevAI] Walk GLB URL: "..url); statusLbl.Text="📋 Walk GLB URL copied."; statusLbl.TextColor3=C.goldLight end
+end)
+animRunGlbBtn.MouseButton1Click:Connect(function()
+	local url = (currentRigAnimUrls.run or {}).glb
+	if url then setclipboard(url); print("[DevAI] Run GLB URL: "..url); statusLbl.Text="📋 Run GLB URL copied."; statusLbl.TextColor3=C.goldLight end
+end)
+animWalkFbxBtn.MouseButton1Click:Connect(function()
+	local url = (currentRigAnimUrls.walk or {}).fbx or (currentRigAnimUrls.walk or {}).url
+	if url then setclipboard(url); print("[DevAI] Walk FBX URL: "..url); statusLbl.Text="📋 Walk FBX URL copied — import in Animation Editor."; statusLbl.TextColor3=C.goldLight end
+end)
+animRunFbxBtn.MouseButton1Click:Connect(function()
+	local url = (currentRigAnimUrls.run or {}).fbx or (currentRigAnimUrls.run or {}).url
+	if url then setclipboard(url); print("[DevAI] Run FBX URL: "..url); statusLbl.Text="📋 Run FBX URL copied — import in Animation Editor."; statusLbl.TextColor3=C.goldLight end
 end)
 
 -- ---------- TESTING PAGE ----------
