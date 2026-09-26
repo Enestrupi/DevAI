@@ -1,6 +1,6 @@
 // DevAI Web App — single-file JS, no framework, no build step.
 // All state lives in localStorage. All provider calls go directly from the browser.
-const APP_VERSION = 11; // bump to force localStorage reset
+const APP_VERSION = 13; // bump to force localStorage reset
 
 // ============================================================================
 // ⚔ DEVAI CONFIG — PASTE YOUR API KEYS HERE FOR "NO SETUP REQUIRED" LAUNCH
@@ -192,6 +192,7 @@ const state = {
   llmModel: CONFIG.DEFAULT_MODEL,
   llmKey: '',
   meshyKey: '',
+  meshProvider: 'meshy',  // 'meshy' | 'tripo'
   memory: { game:'', currency:'', mainUI:'', admin:'', extra:'' },
   sessionCode: '',
   mesh: null, // { previewTaskId, refineTaskId, modelUrlGlb, ..., rigTaskId }
@@ -789,7 +790,8 @@ $('animSend').addEventListener('click',()=>sendToStudio(null, 'AnimationControll
 // ---------- SETTINGS ----------
 function refreshSettingsUI() {
   $('setLlmKey').value=state.llmKey||'';
-  $('setMeshyKey').value=state.meshyKey||'';
+  $('setMeshyKey').value=state.meshyKey||state.tripoKey||'';
+  if($('meshProvider')) $('meshProvider').value = state.meshProvider||'meshy';
   // Show a "saved" badge with last 4 chars
   const badge=$('keySavedBadge');
   if (state.llmKey && state.llmKey.length > 6) {
@@ -889,14 +891,14 @@ $('saveLlm').addEventListener('click',()=>{
   save(); refreshSettingsUI(); buildChatModelPicker();
   toast(state.llmKey?'✅ LLM key saved — remembered on this device.':'Switched to no-key mode.');
 });
+$('meshProvider')?.addEventListener('change',(e)=>{
+  state.meshProvider = e.target.value; save(); refreshSettingsUI();
+});
 $('saveMeshy').addEventListener('click',()=>{
   state.meshyKey=$('setMeshyKey').value.trim();
+  state.meshProvider=$('meshProvider')?.value||'meshy';
   save(); refreshSettingsUI();
-  if(state.meshyKey){
-    toast('✅ Meshy key saved — remembered on this device.');
-  } else {
-    toast('Meshy key cleared.');
-  }
+  toast(state.meshProvider.toUpperCase()+' key saved.');
 });
 $('saveMemory').addEventListener('click',()=>{
   state.memory={
