@@ -1,6 +1,6 @@
 // DevAI Web App — single-file JS, no framework, no build step.
 // All state lives in localStorage. All provider calls go directly from the browser.
-const APP_VERSION = 13; // bump to force localStorage reset
+const APP_VERSION = 14; // bump to force localStorage reset
 
 // ============================================================================
 // ⚔ DEVAI CONFIG — PASTE YOUR API KEYS HERE FOR "NO SETUP REQUIRED" LAUNCH
@@ -288,6 +288,9 @@ function buildSystemContext() {
   if (m.mainUI) lines.push('Main UI module: '+m.mainUI);
   if (m.admin) lines.push('Admin system: '+m.admin);
   if (m.extra) lines.push('Extra instructions: '+m.extra);
+  // Studio sync context (Explorer + selected scripts user sent)
+  const ctx = $('studioContext')?.value?.trim();
+  if (ctx) lines.push('\n=== USER\'S ROBLOX STUDIO PROJECT CONTEXT (live, sent from plugin) ===\n'+ctx+'\n=== END STUDIO CONTEXT ===\nUse the above context to understand what the user already has in their place. Reference existing scripts by their path when modifying them. If the user asks "fix my script" or "what do I have", the answer is in this context.');
   return lines.join('\n');
 }
 
@@ -461,11 +464,12 @@ async function sendToStudio(preId, titleOverride, typeOverride) {
   if(!code) { toast('No code to send. Generate a script first.'); return; }
   if(!state.sessionCode) genSessionCode();
   const sess = state.sessionCode;
-  const title = titleOverride || 'DevAI Script';
+  const title = (titleOverride || 'DevAI Script').substring(0,40);
   const stype = typeOverride || 'Script';
   const target = stype === 'LocalScript' ? 'StarterPlayerScripts'
                : stype === 'ModuleScript' ? 'ReplicatedStorage'
                : 'ServerScriptService';
+  // Pipe-delimited: TITLE|TYPE|TARGET|BODY — pipe only appears as separator since title/type/target have no pipes
   const message = title+'|'+stype+'|'+target+'|'+code;
   if (message.length > 3900) {
     toast('⚠ Script too long (>4KB). Copy and paste instead.');
@@ -475,13 +479,89 @@ async function sendToStudio(preId, titleOverride, typeOverride) {
   try {
     const res = await fetch('https://ntfy.sh/'+topic, {
       method:'POST', body: message,
-      headers: { 'Title':'DevAI: '+title, 'Tags':'robot' },
+      headers: { 'Title':'DevAI: '+title, 'Tags':'robot,inbox' },
     });
     if (!res.ok) throw new Error('HTTP '+res.status);
-    toast('📤 Sent to Studio! Check the plugin panel.');
+    // Auto-start listener if not running so user sees responses
+    if (!studioListenActive) startStudioListen();
+    toast('📤 Sent to Studio! Should auto-insert in 1-2 seconds.');
+    appendStudioLog('📤 OUT → Studio: '+title+' ('+stype+')', 'moss');
   } catch(e) {
     toast('❌ Send failed: '+e.message);
   }
+}
+
+// ---------- RECEIVE FROM STUDIO ----------
+let studioListenActive = false;
+let studioAbort = null;
+function appendStudioLog(text, color) {
+  const log = $('studioLog');
+  if(!log) return;
+  const line = document.createElement('div');
+  line.style.color = color ? `var(--${color})` : 'var(--text-dim)';
+  line.textContent = new Date().toLocaleTimeString().padStart(8,' ')+'  '+text;
+  if (log.firstChild && log.firstChild.tagName==='I') log.innerHTML='';
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
+async function startStudioListen() {
+  if(!state.sessionCode) genSessionCode();
+  const topic = 'devai-' + state.sessionCode.toLowerCase();
+  if (studioAbort) studioAbort.abort();
+  studioAbort = new AbortController();
+  studioListenActive = true;
+  $('studioStatus').textContent = '🟢 Listening on '+state.sessionCode+'…';
+  $('studioStatus').style.color = 'var(--moss)';
+  appendStudioLog('🎧 Started listening for Studio messages…');
+  try {
+    const since = Math.floor(Date.now()/1000)-5;
+    while(studioListenActive) {
+      const res = await fetch('https://ntfy.sh/'+topic+'/json?since='+since+'&poll=1', { signal: studioAbort.signal, cache:'no-store' });
+      if (!res.ok) { await new Promise(r=>setTimeout(r,3000)); continue; }
+      const text = await res.text();
+      for (const line of text.split('\n')) {
+        if (line.length < 5) continue;
+        try {
+          const evt = JSON.parse(line);
+          if (evt.event !== 'message') continue;
+          const tags = evt.tags || '';
+          // Skip our own outbound messages
+          if (tags.includes('inbox')) continue;
+          const body = evt.message || '';
+          // Try to parse as JSON (plugin sends JSON for explorer/script/hello)
+          let data;
+          try { data = JSON.parse(body); } catch { data = null; }
+          if (data && data.kind) {
+            if (data.kind === 'hello') {
+              $('studioStatus').textContent = '🟢 Studio connected! PlaceId='+data.data.match(/PlaceId=(\d+)/)?.[1];
+              $('studioStatus').style.color = 'var(--moss)';
+              appendStudioLog('✅ Plugin connected: '+data.data, 'gold-light');
+            } else if (data.kind === 'explorer') {
+              appendStudioLog('📂 Received Explorer snapshot ('+data.data.length+' chars) — injected into AI context.', 'amber');
+              $('studioContext').value = data.data;
+              toast('📂 Explorer sent to AI — AI can now see your project!');
+            } else if (data.kind === 'script') {
+              appendStudioLog('📄 Received script: '+data.path+' ('+(data.data?.length||0)+' chars)', 'amber');
+              const existing = $('studioContext').value || '';
+              $('studioContext').value = (existing ? existing + '\n\n---\n\n' : '') + data.data;
+              toast('📄 Script sent to AI!');
+            } else {
+              appendStudioLog('📩 '+data.kind+': '+(data.data||'').slice(0,200), 'moss');
+            }
+          } else {
+            appendStudioLog('📩 Unknown: '+body.slice(0,120));
+          }
+        } catch(e) { /* ignore bad json */ }
+      }
+    }
+  } catch(e) {
+    if (e.name !== 'AbortError') {
+      appendStudioLog('❌ Listener error: '+e.message, 'red');
+    }
+  }
+  studioListenActive = false;
+  $('studioStatus').textContent = '⚪ Stopped.';
+  $('studioStatus').style.color = 'var(--dim)';
 }
 async function sendChat() {
   const txt=$('chatInput').value.trim();
@@ -567,6 +647,55 @@ $('meshGenerate').addEventListener('click', async ()=>{
   const prompt=$('meshPrompt').value.trim();
   if(!prompt) return toast('Enter a prompt first');
   const style=$('meshStyle').value;
+  const provider = state.meshProvider || 'hunyuan';
+
+  // Hunyuan3D "no key" mode: generate 4 turntable views via Pollinations image API
+  if (provider === 'hunyuan') {
+    setStatus('meshStatus','Generating 4-view turntable via Hunyuan3D/Pollinations (no key, ~15s)…','warn');
+    $('meshProgress').style.display='block';
+    $('meshProgress').firstElementChild.style.width='10%';
+    const views = [
+      {label:'Front view',  angle:'front view, facing camera'},
+      {label:'Right side',  angle:'right side view, profile'},
+      {label:'Back view',   angle:'back view, from behind'},
+      {label:'3/4 view',    angle:'three-quarter view, 45 degrees'},
+    ];
+    const urls = [];
+    for (let i=0;i<views.length;i++){
+      const v = views[i];
+      const p = encodeURIComponent(prompt+', ancient fantasy bronze gold mossy stone aesthetic, 3D game asset, white background, studio lighting, '+v.angle+', '+style);
+      const seed = Math.floor(Math.random()*99999);
+      urls.push({label:v.label, url:`https://image.pollinations.ai/prompt/${p}?width=512&height=512&seed=${seed}&nologo=true&model=flux`});
+      $('meshProgress').firstElementChild.style.width = (20 + i*20)+'%';
+      // Wait a tiny bit so requests start (images will lazy-load)
+      await new Promise(r=>setTimeout(r,200));
+    }
+    $('meshProgress').firstElementChild.style.width='100%';
+    // Render a 2x2 turntable grid
+    const html = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+      ${urls.map(u=>`<div style="text-align:center"><img src="${u.url}" alt="${u.label}" style="width:100%;border-radius:8px;border:1px solid var(--border);background:#111;" crossorigin="anonymous"/><div class="tiny" style="color:var(--text-dim);margin-top:4px">${u.label}</div></div>`).join('')}
+    </div>
+    <p class="tiny" style="margin-top:10px;color:var(--amber)">
+      ⚠ <b>This is a 4-view preview (no-key mode).</b> To get a real downloadable .glb/.fbx model you can import into Roblox Studio, switch provider to <b>Meshy</b> above and paste a free key (100 free credits/month at <a href="https://www.meshy.ai/settings/api" target="_blank" style="color:var(--amber)">meshy.ai/settings/api</a>).
+    </p>`;
+    $('meshPreview').innerHTML = html;
+    $('meshPreview').style.display='block';
+    $('meshPreview').scrollIntoView({behavior:'smooth',block:'nearest'});
+    setStatus('meshStatus','✓ 4-view preview ready (no-key mode). Switch to Meshy for GLB download.','ok');
+    return;
+  }
+
+  if (!state.meshyKey && provider === 'meshy') {
+    setStatus('meshStatus','❌ Enter a Meshy key in Settings (100 free/month).','err');
+    toast('Get a free Meshy key: meshy.ai/settings/api');
+    goPage('settings'); return;
+  }
+  if (!state.meshyKey && provider === 'tripo') {
+    setStatus('meshStatus','❌ Enter a Tripo key in Settings.','err');
+    goPage('settings'); return;
+  }
+
+  // Meshy path
   $('meshGenerate').disabled=true;
   setStatus('meshStatus','Requesting preview…','warn');
   $('meshProgress').style.display='block';
@@ -937,8 +1066,10 @@ $('resetAll').addEventListener('click',()=>{
 });
 
 // ---------- STUDIO SYNC ----------
-$('genSession').addEventListener('click', genSessionCode);
+$('genSession').addEventListener('click', ()=>{ genSessionCode(); if(studioListenActive){ studioListenActive=false; studioAbort?.abort(); setTimeout(startStudioListen,200); }});
 $('copySession').addEventListener('click',()=>copyText($('sessionCode').value));
+$('startListen').addEventListener('click', startStudioListen);
+$('clearCtx').addEventListener('click', ()=>{ $('studioContext').value=''; toast('Context cleared.'); });
 
 // ---------- boot ----------
 load();

@@ -409,15 +409,42 @@ iframe.model-viewer { width:100%; height:400px; border:none; border-radius:8px; 
     <!-- STUDIO SYNC -->
     <section class="page" id="page-studio">
       <h2>🔌 Studio Sync</h2>
-      <p class="subtitle">Generate a session code. In the DevAI Roblox Studio plugin → Settings, paste this code to pair. The plugin will poll for approved scripts to insert (coming in a future relay update — right now you can copy code from any tab and paste it in Studio).</p>
+      <p class="subtitle">Pair this website with the DevAI Roblox plugin so scripts flow both ways: website → Studio (auto-paste) and Studio → website (AI can SEE your project, selected scripts, and errors).</p>
+
       <div class="card">
         <label>Your session code</label>
         <div style="display:flex; gap:8px;">
-          <input type="text" id="sessionCode" readonly style="flex:1; font-size:18px; text-align:center; letter-spacing:4px; font-weight:900; color:var(--gold-light);"/>
+          <input type="text" id="sessionCode" readonly style="flex:1; font-size:22px; text-align:center; letter-spacing:6px; font-weight:900; color:var(--gold-light); font-family:var(--mono);"/>
           <button class="btn bronze" id="genSession">🔄 New Code</button>
           <button class="btn ghost" id="copySession">📋 Copy</button>
         </div>
-        <p class="tiny" style="margin-top:10px;">A future DevAI update will add a Cloudflare relay so the plugin can auto-receive and apply approved scripts/images/models from this web app without copy/paste. Today, all copy-to-clipboard buttons work with the existing plugin.</p>
+        <p class="tiny" style="margin-top:8px;">
+          <b>Steps:</b> (1) Copy the code above → (2) Paste it in the DevAI plugin panel inside Studio → (3) Click 🔌 Connect in the plugin → (4) Status below turns 🟢 green when Studio is online.
+        </p>
+      </div>
+
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="color:var(--gold-light); margin:0;">🟢 Connection status</h3>
+          <span id="studioStatus" class="tiny" style="color:var(--dim);">⚪ Waiting for plugin…</span>
+        </div>
+        <div style="margin-top:10px;">
+          <button class="btn moss" id="startListen">👂 Start listening to Studio</button>
+          <span class="tiny" style="color:var(--dim);margin-left:8px;">Must be clicked after you connect the plugin in Studio (browser security blocks auto-polling until you click).</span>
+        </div>
+        <div id="studioLog" style="margin-top:12px; max-height:200px; overflow-y:auto; background:var(--bg-panel); border:1px solid var(--border); border-radius:6px; padding:8px; font-family:var(--mono); font-size:10px; color:var(--text-dim);">
+          <i style="color:var(--text-faint)">Nothing received yet. Click "Start listening" and then connect the plugin.</i>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="color:var(--gold-light); margin-top:0;">🧠 What AI can see</h3>
+        <p class="tiny">When you click <b>📂 Send Explorer to AI</b> or <b>📄 Send Selected Script</b> in the plugin, the data appears here and is auto-injected into the next chat message so the AI knows your project structure and existing code. Clear anytime.</p>
+        <div class="btnrow">
+          <button class="btn ghost" id="clearCtx">🗑 Clear AI context</button>
+        </div>
+        <label style="margin-top:8px;display:block;">Explorer / Script context sent from Studio (editable before sending to AI):</label>
+        <textarea id="studioContext" style="height:200px; font-family:var(--mono); font-size:10px;" placeholder="Once you click 'Send Explorer to AI' in the plugin, your project tree will appear here. The AI will see it automatically in chat."></textarea>
       </div>
     </section>
 
@@ -487,7 +514,8 @@ iframe.model-viewer { width:100%; height:400px; border:none; border-radius:8px; 
           <div style="flex:1;">
             <label>Provider</label>
             <select id="meshProvider">
-              <option value="meshy">Meshy (100 free credits/month ← recommended)</option>
+              <option value="hunyuan" selected>🆓 Hunyuan3D Preview (no key, image turntable — GLB requires key)</option>
+              <option value="meshy">Meshy (100 free credits/month ← real GLB download)</option>
               <option value="tripo">Tripo (your key — needs credits)</option>
             </select>
           </div>
@@ -522,6 +550,6 @@ iframe.model-viewer { width:100%; height:400px; border:none; border-radius:8px; 
   </main>
 </div>
 <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-<script src="app.js?v=13"></script>
+<script src="app.js?v=14"></script>
 </body>
 </html>
