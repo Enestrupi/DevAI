@@ -26,7 +26,7 @@ const CONFIG = {
   DEFAULT_LLM_KEY:  _K.join("") || "pollinations-free",   // pollinations-free = built-in zero-key mode
   DEFAULT_MESHY_KEY:"",            // paste your msy_... (Meshy) key here (optional)
   DEFAULT_MODEL:    "openai",      // Pollinations free routing (GPT-level)
-  DEFAULT_LLM_URL:  "https://text.pollinations.ai/openai/v1",  // 100% free, no key
+  DEFAULT_LLM_URL:  "https://gen.pollinations.ai/v1",  // 100% free, no key
 };
 // ============================================================================
 
@@ -34,8 +34,46 @@ const $ = (id) => document.getElementById(id);
 
 // Provider preset metadata. The dropdown value in HTML must match url|model here.
 // Default preset on first visit.
-const DEFAULT_PRESET = 'https://openrouter.ai/api/v1|meta-llama/llama-3.1-8b-instruct:free';
-const RECOMMENDED_CODING = 'https://openrouter.ai/api/v1|qwen/qwen3-coder:free';
+const DEFAULT_PRESET = 'https://text.pollinations.ai/openai/v1|openai';
+
+// Models available IN THE CHAT TAB. Each entry: {value:"url|model", label, tag:NO KEY|FREE|PAID, group}.
+// Tag colors: NO KEY=green, FREE=moss, PAID=red, PAYG=amber.
+const CHAT_MODELS = [
+  { group:'⚡ No key needed (instant)' ,
+    models:[
+      {v:'https://gen.pollinations.ai/v1|openai',                               label:'Pollinations — GPT-level (auto, no signup)',        tag:'NO KEY'},
+    ]},
+  { group:'🆓 Free — Coding (best for Luau, needs free OpenRouter key)',
+    models:[
+      {v:'https://openrouter.ai/api/v1|qwen/qwen3-coder:free',                  label:'Qwen3 Coder (1M ctx, strongest free coder)',        tag:'FREE'},
+      {v:'https://openrouter.ai/api/v1|deepseek/deepseek-v4-flash:free',        label:'DeepSeek V4 Flash (1M ctx, reasoning)',             tag:'FREE'},
+      {v:'https://openrouter.ai/api/v1|poolside/laguna-m.1:free',               label:'Poolside Laguna M.1 (agentic code)',                tag:'FREE'},
+      {v:'https://openrouter.ai/api/v1|cohere/north-mini-code:free',            label:'Cohere North Mini Code (terminal code)',            tag:'FREE'},
+      {v:'https://api.groq.com/openai/v1|llama-3.3-70b-versatile',              label:'Groq Llama 3.3 70B (⚡ fastest)',                    tag:'FREE'},
+    ]},
+  { group:'🆓 Free — Reasoning & big context',
+    models:[
+      {v:'https://openrouter.ai/api/v1|nvidia/nemotron-3-ultra-550b-a55b:free', label:'NVIDIA Nemotron Ultra 550B (550B, 1M ctx)',         tag:'FREE'},
+      {v:'https://openrouter.ai/api/v1|meta-llama/llama-3.3-70b-instruct:free', label:'Llama 3.3 70B (reliable baseline)',                 tag:'FREE'},
+      {v:'https://openrouter.ai/api/v1|openai/gpt-oss-120b:free',               label:'OpenAI gpt-oss-120b (open-weight)',                 tag:'FREE'},
+      {v:'https://openrouter.ai/api/v1|openrouter/free',                        label:'OpenRouter Free (auto-router)',                     tag:'FREE'},
+    ]},
+  { group:'🆓 Free — Vision (describe screenshots)',
+    models:[
+      {v:'https://openrouter.ai/api/v1|google/gemma-4-31b-it:free',             label:'Google Gemma 4 31B (vision + text)',                tag:'FREE'},
+    ]},
+  { group:'💰 Paid (requires credits)',
+    models:[
+      {v:'https://openrouter.ai/api/v1|anthropic/claude-3.5-sonnet',           label:'Claude 3.5 Sonnet',                                 tag:'PAID'},
+      {v:'https://openrouter.ai/api/v1|openai/gpt-4o-mini',                     label:'GPT-4o-mini',                                      tag:'PAID'},
+      {v:'https://api.moonshot.cn/v1|kimi-k3',                                  label:'Moonshot Kimi K3 (1M ctx)',                         tag:'PAID'},
+    ]},
+];
+
+// Known-retired model slugs that will 404 — auto-migrate users off these.
+const RETIRED_SLUGS = {
+  'meta-llama/llama-3.1-8b-instruct:free': 'https://openrouter.ai/api/v1|meta-llama/llama-3.3-70b-instruct:free',
+};
 
 const PRESETS = {
   // ---- FREE CODING (best for DevAI script generation) ----
@@ -82,9 +120,9 @@ const PRESETS = {
     label:'OpenRouter Free (auto)', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
     free:true, note:'OpenRouter picks whichever free model is available. Handy fallback if a specific model is rate-limited.'
   },
-  'https://text.pollinations.ai/openai/v1|openai': {
+  'https://gen.pollinations.ai/v1|openai': {
     label:'Pollinations AI (no key)', signup:'', signupUrl:'',
-    free:true, nokey:true, note:'⚡ DEFAULT — 100% free, no signup, no API key. Community-served; may be slower during peak hours. Powered by open models.'
+    free:true, nokey:true, note:'⚡ DEFAULT — 100% free, no signup, no API key. Anonymous access to open models (GPT-level).'
   },
   'https://openrouter.ai/api/v1|meta-llama/llama-3.1-8b-instruct:free': {
     label:'Llama 3.1 8B', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
@@ -224,12 +262,14 @@ document.querySelectorAll('nav button[data-page]').forEach(btn=>{
   btn.addEventListener('click', ()=>goPage(btn.dataset.page));
 });
 
-// ---------- LLM call ----------
 async function llmCall(messages, opts={}) {
+  return _llmCall(messages, opts, false);
+}
+async function _llmCall(messages, opts, retrying) {
   const isPollinations = state.llmUrl && state.llmUrl.indexOf('pollinations.ai') !== -1;
   const key = state.llmKey || '';
   if (!isPollinations && (!key || key === 'pollinations-free')) {
-    throw new Error('No LLM API key configured. Add one in Settings, or switch to Pollinations (free, no key).');
+    throw new Error('No LLM API key configured for this model. Switch to Pollinations (no key) in Settings or the model picker.');
   }
   const body = {
     model: state.llmModel,
@@ -239,25 +279,87 @@ async function llmCall(messages, opts={}) {
   };
   if (opts.max_tokens) body.max_tokens=opts.max_tokens;
   const headers = { 'Content-Type':'application/json' };
-  // Pollinations works with or without auth; send a harmless dummy to keep OpenAI SDKs happy
   headers['Authorization'] = 'Bearer ' + (isPollinations ? (key && key !== 'pollinations-free' ? key : 'free') : key);
   headers['HTTP-Referer'] = location.href;
   headers['X-Title']='DevAI';
   const res = await fetch(state.llmUrl + '/chat/completions', {
-    method:'POST',
-    headers,
-    body: JSON.stringify(body),
+    method:'POST', headers, body: JSON.stringify(body),
   });
   if (!res.ok) {
     const errText = await res.text();
+    if (res.status === 404 && !retrying && errText && (errText.indexOf('unavailable')!==-1 || errText.indexOf('retired')!==-1 || errText.indexOf('Model not found')!==-1)) {
+      console.warn('Model unavailable, falling back to Pollinations:', errText.slice(0,200));
+      state.llmUrl = CONFIG.DEFAULT_LLM_URL;
+      state.llmModel = CONFIG.DEFAULT_MODEL;
+      state.llmKey = '';
+      save(); refreshSettingsUI(); buildChatModelPicker();
+      toast('⚠ Model unavailable — switched to free Pollinations');
+      return _llmCall(messages, opts, true);
+    }
     throw new Error('LLM error '+res.status+': '+errText.slice(0,400));
   }
   const data = await res.json();
   return data.choices?.[0]?.message?.content || '(empty response)';
 }
 
-// ---------- CHAT ----------
-const chatList = $('chatList');
+// ---------- CHAT MODEL PICKER ----------
+function buildChatModelPicker() {
+  const sel=$('chatModelPicker');
+  if(!sel) return;
+  sel.innerHTML='';
+  CHAT_MODELS.forEach(group=>{
+    const og=document.createElement('optgroup');
+    og.label=group.group;
+    group.models.forEach(m=>{
+      const o=document.createElement('option');
+      o.value=m.v;
+      o.textContent=m.label+' ['+m.tag+']';
+      og.appendChild(o);
+    });
+    sel.appendChild(og);
+  });
+  const current = state.llmUrl+'|'+state.llmModel;
+  // If current model is retired, migrate
+  if (RETIRED_SLUGS[current]) {
+    const [url,model]=RETIRED_SLUGS[current].split('|');
+    state.llmUrl=url; state.llmModel=model; save();
+  }
+  // Set select value
+  const cur = state.llmUrl+'|'+state.llmModel;
+  let found=false;
+  for (const og of sel.options){ if(og.value===cur){ og.selected=true; found=true; break; } }
+  if(!found){
+    // Add as a "Custom" pseudo-option at top
+    const o=document.createElement('option');
+    o.value=cur; o.textContent='(Custom: '+state.llmModel+')';
+    sel.insertBefore(o, sel.firstChild);
+    o.selected=true;
+  }
+  updateChatModelBadge();
+}
+function updateChatModelBadge(){
+  const b=$('chatModelBadge'); if(!b) return;
+  const v=state.llmUrl+'|'+state.llmModel;
+  const isPoll = state.llmUrl.indexOf('pollinations.ai') !== -1;
+  let tag=''; let color='var(--dim)';
+  if (isPoll && (!state.llmKey || state.llmKey==='pollinations-free')) { tag='NO KEY · works instantly'; color='var(--green)'; }
+  else {
+    for (const g of CHAT_MODELS) for (const m of g.models) if (m.v===v) { tag=m.tag; break; }
+    color = tag==='NO KEY'?'var(--green)':tag==='FREE'?'var(--moss)':tag==='PAID'?'var(--red)':'var(--amber)';
+  }
+  if (!tag) tag = state.llmKey ? 'PAYG' : 'needs key';
+  b.textContent=tag;
+  b.style.color=color;
+}
+if ($('chatModelPicker')) $('chatModelPicker').addEventListener('change',(e)=>{
+  const v=e.target.value;
+  const [url,model]=v.split('|');
+  state.llmUrl=url; state.llmModel=model; save();
+  refreshSettingsUI();
+  updateChatModelBadge();
+  toast('🔄 Switched model: '+model);
+});
+
 function addMsg(who, text, isUser) {
   const div=document.createElement('div');
   div.className='msg '+(isUser?'user':'ai');
@@ -661,6 +763,8 @@ $('setPreset').addEventListener('change',()=>{
     state.llmUrl=url; state.llmModel=model; save();
   }
   updatePresetHint();
+  refreshSettingsUI();
+  buildChatModelPicker();
 });
 $('saveLlm').addEventListener('click',()=>{
   state.llmKey=$('setLlmKey').value.trim();
@@ -668,12 +772,14 @@ $('saveLlm').addEventListener('click',()=>{
     state.llmUrl=$('setLlmUrl').value.trim()||state.llmUrl;
     state.llmModel=$('setLlmModel').value.trim()||state.llmModel;
   }
-  save(); refreshSettingsUI();
-  if(state.llmKey){
-    toast('✅ LLM key saved — remembered on this device.');
-  } else {
-    toast('LLM key cleared.');
+  // Clear the "pollinations-free" sentinel if user cleared the field
+  if(!state.llmKey && state.llmUrl.indexOf('pollinations.ai')===-1){
+    // No key + not pollinations = switch back to pollinations so the app keeps working
+    state.llmUrl=CONFIG.DEFAULT_LLM_URL; state.llmModel=CONFIG.DEFAULT_MODEL;
+    toast('No key saved — switched to free Pollinations');
   }
+  save(); refreshSettingsUI(); buildChatModelPicker();
+  toast(state.llmKey?'✅ LLM key saved — remembered on this device.':'Switched to no-key mode.');
 });
 $('saveMeshy').addEventListener('click',()=>{
   state.meshyKey=$('setMeshyKey').value.trim();
@@ -728,3 +834,4 @@ $('copySession').addEventListener('click',()=>copyText($('sessionCode').value));
 load();
 if (!state.sessionCode) genSessionCode();
 refreshSettingsUI();
+buildChatModelPicker();
