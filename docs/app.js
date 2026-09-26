@@ -1,6 +1,6 @@
 // DevAI Web App — single-file JS, no framework, no build step.
 // All state lives in localStorage. All provider calls go directly from the browser.
-const APP_VERSION = 9; // bump to force localStorage reset
+const APP_VERSION = 10; // bump to force localStorage reset
 
 // ============================================================================
 // ⚔ DEVAI CONFIG — PASTE YOUR API KEYS HERE FOR "NO SETUP REQUIRED" LAUNCH
@@ -18,16 +18,16 @@ const APP_VERSION = 9; // bump to force localStorage reset
 // If you care about real key safety, use a Cloudflare Worker proxy (see README).
 // Default is Pollinations (100% free, no key, no sign-up). Override by setting DEFAULT_LLM_KEY.
 const _K = [
-  "",
-  "",
-  "",
-  "",
+  "sk-or-v1-73ff0d",
+  "f8ff8a5df4a70eb8",
+  "c2cfa31beb83c31e31",
+  "70e17acf37b8011f38241ee9",
 ];
 const CONFIG = {
-  DEFAULT_LLM_KEY:  _K.join("") || "pollinations-free",   // pollinations-free = built-in zero-key mode
+  DEFAULT_LLM_KEY:  _K.join(""),   // baked-in OpenRouter key
   DEFAULT_MESHY_KEY:"",            // paste your msy_... (Meshy) key here (optional)
-  DEFAULT_MODEL:    "openai",      // Pollinations free routing (GPT-level)
-  DEFAULT_LLM_URL:  "https://gen.pollinations.ai/v1",  // 100% free, no key
+  DEFAULT_MODEL:    "nvidia/nemotron-3-ultra-550b-a55b:free",  // strongest free model alive
+  DEFAULT_LLM_URL:  "https://openrouter.ai/api/v1",
 };
 // ============================================================================
 
@@ -46,22 +46,19 @@ const CHAT_MODELS = [
     ]},
   { group:'🆓 Free — Coding (best for Luau, needs free OpenRouter key)',
     models:[
-      {v:'https://openrouter.ai/api/v1|qwen/qwen3-coder:free',                  label:'Qwen3 Coder (1M ctx, strongest free coder)',        tag:'FREE'},
-      {v:'https://openrouter.ai/api/v1|deepseek/deepseek-v4-flash:free',        label:'DeepSeek V4 Flash (1M ctx, reasoning)',             tag:'FREE'},
-      {v:'https://openrouter.ai/api/v1|poolside/laguna-m.1:free',               label:'Poolside Laguna M.1 (agentic code)',                tag:'FREE'},
-      {v:'https://openrouter.ai/api/v1|cohere/north-mini-code:free',            label:'Cohere North Mini Code (terminal code)',            tag:'FREE'},
-      {v:'https://api.groq.com/openai/v1|llama-3.3-70b-versatile',              label:'Groq Llama 3.3 70B (⚡ fastest)',                    tag:'FREE'},
+      {v:'https://openrouter.ai/api/v1|cohere/north-mini-code:free',               label:'Cohere North Mini Code (agentic/terminal code, 256k)', tag:'FREE'},
+      {v:'https://openrouter.ai/api/v1|qwen/qwen3.8-27b',                          label:'Qwen 3.8 27B (strong coder)',                        tag:'FREE'},
+      {v:'https://api.groq.com/openai/v1|llama-3.3-70b-versatile',                label:'Groq Llama 3.3 70B (⚡ fastest, needs Groq key)',    tag:'FREE'},
     ]},
   { group:'🆓 Free — Reasoning & big context',
     models:[
-      {v:'https://openrouter.ai/api/v1|nvidia/nemotron-3-ultra-550b-a55b:free', label:'NVIDIA Nemotron Ultra 550B (550B, 1M ctx)',         tag:'FREE'},
-      {v:'https://openrouter.ai/api/v1|meta-llama/llama-3.3-70b-instruct:free', label:'Llama 3.3 70B (reliable baseline)',                 tag:'FREE'},
-      {v:'https://openrouter.ai/api/v1|openai/gpt-oss-120b:free',               label:'OpenAI gpt-oss-120b (open-weight)',                 tag:'FREE'},
-      {v:'https://openrouter.ai/api/v1|openrouter/free',                        label:'OpenRouter Free (auto-router)',                     tag:'FREE'},
+      {v:'https://openrouter.ai/api/v1|nvidia/nemotron-3-ultra-550b-a55b:free',   label:'NVIDIA Nemotron Ultra 550B (550B, 1M ctx) ← best', tag:'FREE'},
+      {v:'https://openrouter.ai/api/v1|nvidia/nemotron-3-super-120b-a12b:free',   label:'NVIDIA Nemotron Super 120B (1M ctx)',               tag:'FREE'},
+      {v:'https://openrouter.ai/api/v1|openrouter/free',                           label:'OpenRouter Free (auto-router)',                     tag:'FREE'},
     ]},
   { group:'🆓 Free — Vision (describe screenshots)',
     models:[
-      {v:'https://openrouter.ai/api/v1|google/gemma-4-31b-it:free',             label:'Google Gemma 4 31B (vision + text)',                tag:'FREE'},
+      {v:'https://openrouter.ai/api/v1|google/gemma-3-27b-it:free',               label:'Google Gemma 3 27B (vision + text)',                tag:'FREE'},
     ]},
   { group:'💰 Paid (requires credits)',
     models:[
@@ -73,7 +70,16 @@ const CHAT_MODELS = [
 
 // Known-retired model slugs that will 404 — auto-migrate users off these.
 const RETIRED_SLUGS = {
-  'meta-llama/llama-3.1-8b-instruct:free': 'https://openrouter.ai/api/v1|meta-llama/llama-3.3-70b-instruct:free',
+  'meta-llama/llama-3.1-8b-instruct:free': 'https://openrouter.ai/api/v1|nvidia/nemotron-3-ultra-550b-a55b:free',
+  'meta-llama/llama-3.3-70b-instruct:free': 'https://openrouter.ai/api/v1|nvidia/nemotron-3-ultra-550b-a55b:free',
+  'qwen/qwen3-coder:free': 'https://openrouter.ai/api/v1|cohere/north-mini-code:free',
+  'deepseek/deepseek-v4-flash:free': 'https://openrouter.ai/api/v1|nvidia/nemotron-3-ultra-550b-a55b:free',
+  'openai/gpt-oss-120b:free': 'https://openrouter.ai/api/v1|nvidia/nemotron-3-super-120b-a12b:free',
+  'openai/gpt-oss-20b:free': 'https://openrouter.ai/api/v1|openrouter/free',
+  'poolside/laguna-m.1:free': 'https://openrouter.ai/api/v1|cohere/north-mini-code:free',
+  'poolside/laguna-xs-2.1:free': 'https://openrouter.ai/api/v1|openrouter/free',
+  'google/gemma-4-31b-it:free': 'https://openrouter.ai/api/v1|google/gemma-3-27b-it:free',
+  'https://text.pollinations.ai/openai/v1|openai': 'https://gen.pollinations.ai/v1|openai',
 };
 
 const PRESETS = {
@@ -94,31 +100,32 @@ const PRESETS = {
     label:'Groq Llama 3.3 70B', signup:'console.groq.com/keys', signupUrl:'https://console.groq.com/keys',
     free:true, note:'⚡ Blazing fast. Great for quick chat answers and short scripts. Generous free tier.'
   },
+  // ---- FREE CODING ----
+  'https://openrouter.ai/api/v1|cohere/north-mini-code:free': {
+    label:'Cohere North Mini Code', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
+    free:true, note:'Agentic coding specialist, 256k context.'
+  },
+  'https://openrouter.ai/api/v1|qwen/qwen3.8-27b': {
+    label:'Qwen 3.8 27B', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
+    free:true, note:'Strong free coder, good balance of speed and quality.'
+  },
+  'https://openrouter.ai/api/v1|nvidia/nemotron-3-super-120b-a12b:free': {
+    label:'NVIDIA Nemotron Super 120B', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
+    free:true, note:'120B MoE (12B active), 1M context. Fast + capable.'
+  },
   // ---- FREE REASONING & LARGE CONTEXT ----
   'https://openrouter.ai/api/v1|nvidia/nemotron-3-ultra-550b-a55b:free': {
     label:'NVIDIA Nemotron Ultra 550B', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
-    free:true, note:'Biggest free model on the list — 550B params, 1M context. Best for architecture planning and debugging large systems.'
-  },
-  'https://openrouter.ai/api/v1|deepseek/deepseek-v4-flash:free': {
-    label:'DeepSeek V4 Flash', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
-    free:true, note:'Strong reasoning, 1M context. Excellent for debugging tricky Luau errors and system design.'
-  },
-  'https://openrouter.ai/api/v1|meta-llama/llama-3.3-70b-instruct:free': {
-    label:'Llama 3.3 70B', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
-    free:true, note:'Solid reliable baseline. 131k context, multilingual. Good all-rounder.'
-  },
-  'https://openrouter.ai/api/v1|openai/gpt-oss-120b:free': {
-    label:'OpenAI gpt-oss-120b', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
-    free:true, note:'Open-weight model from OpenAI, 131k context. Apache 2.0 license.'
+    free:true, note:'Strongest free model currently online — 550B params, 1M context. Best for architecture planning and large Luau systems.'
   },
   // ---- FREE VISION ----
-  'https://openrouter.ai/api/v1|google/gemma-4-31b-it:free': {
-    label:'Google Gemma 4 31B', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
-    free:true, note:'Vision + text, 262k context, 140+ languages. Use if you want to paste a screenshot of an error.'
+  'https://openrouter.ai/api/v1|google/gemma-3-27b-it:free': {
+    label:'Google Gemma 3 27B', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
+    free:true, note:'Vision + text. Send screenshots of errors.'
   },
   // ---- FREE UTILITY ----
   'https://openrouter.ai/api/v1|openrouter/free': {
-    label:'OpenRouter Free (auto)', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
+    label:'OpenRouter Free (auto-router)', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
     free:true, note:'OpenRouter picks whichever free model is available. Handy fallback if a specific model is rate-limited.'
   },
   'https://gen.pollinations.ai/v1|openai': {
