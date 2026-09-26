@@ -15,7 +15,7 @@ local toolbar = plugin:CreateToolbar("DevAI")
 local button = toolbar:CreateButton("DevAI", "Open DevAI AI Co-Developer", "rbxassetid://17870407023")
 local widgetInfo = DockWidgetPluginGuiInfo.new(Enum.InitialDockState.Float, true, false, 540, 620, 360, 400)
 local gui = plugin:CreateDockWidgetPluginGui("DevAI_v3", widgetInfo)
-gui.Title = "DevAI v3.0 — Studio ↔ Website"
+gui.Title = "DevAI v3.2 — Studio ↔ Website"
 
 button.Click:Connect(function() gui.Enabled = not gui.Enabled end)
 
@@ -262,8 +262,12 @@ local function startPolling(code)
 	pollTask = task.spawn(function()
 		local backoff = 2
 		local consecutiveErrors = 0
+		local lastEventId = ""
 		while connected do
-			local url = "https://ntfy.sh/"..topic.."/json?since="..lastTs.."&poll=1"
+			-- Simple poll every 2s (no streaming). since=<id> returns only new messages.
+			local url = "https://ntfy.sh/"..topic.."/json?since="
+			if lastEventId ~= "" then url = url..lastEventId else url = url.."all" end
+			url = url.."&r="..tostring(math.random(100000,999999))
 			local ok, resp = pcall(function()
 				return HttpService:GetAsync(url, true)
 			end)
@@ -273,13 +277,14 @@ local function startPolling(code)
 				for line in string.gmatch(resp,"[^\n]+") do
 					if #line > 10 then
 						local okJ, evt = pcall(HttpService.JSONDecode, HttpService, line)
-						if okJ and evt and evt.message then
-							local evtTime = tonumber(evt.time) or 0
-							if evtTime > lastTs then lastTs=evtTime end
+						if okJ and evt then
+							if evt.id then lastEventId = evt.id end
+							local ev = evt.event or ""
 							local tags = evt.tags or ""
-							if not tags:find("outbox") then
+							local msg = evt.message
+							if ev ~= "open" and (ev == "" or ev == "message") and msg and not tags:find("outbox") then
 								local parts = {}
-								for p in string.gmatch(evt.message,"[^|]+") do table.insert(parts,p) end
+								for p in string.gmatch(msg,"[^|]+") do table.insert(parts,p) end
 								if #parts >= 4 then
 									local title = parts[1]
 									local stype = parts[2]
@@ -287,8 +292,8 @@ local function startPolling(code)
 									local body = table.concat(parts,"|",4)
 									insertScript(title, body, stype, target)
 									setStatus("📨 Received: "..title, C.goldLight)
-								else
-									insertScript("DevAI Script", evt.message, "Script", "ServerScriptService")
+								elseif #msg > 5 and not msg:find("^{") then
+									insertScript("DevAI Script", msg, "Script", "ServerScriptService")
 								end
 							end
 						end
@@ -296,15 +301,13 @@ local function startPolling(code)
 				end
 			else
 				consecutiveErrors = consecutiveErrors+1
-				if consecutiveErrors <= 3 then
-					setStatus("⚠ Network error ("..tostring(resp or "unknown")..") retrying in "..backoff.."s…", C.amber)
-				elseif consecutiveErrors % 10 == 0 then
-					setStatus("⚠ Still can't reach sync server. Check HttpService / internet.", C.red)
+				if consecutiveErrors <= 3 or consecutiveErrors % 10 == 0 then
+					setStatus("⚠ Network error (HttpService enabled? check Game Settings → Security). Retry in "..backoff.."s…", consecutiveErrors<=3 and C.amber or C.red)
 				end
 				task.wait(backoff)
 				backoff = math.min(backoff*2, 30)
 			end
-			task.wait(1)
+			task.wait(2)
 		end
 	end)
 end

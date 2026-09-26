@@ -1,6 +1,6 @@
 // DevAI Web App — single-file JS, no framework, no build step.
 // All state lives in localStorage. All provider calls go directly from the browser.
-const APP_VERSION = 15;
+const APP_VERSION = 16;
 
 // ============================================================================
 // ⚔ DEVAI CONFIG — PASTE YOUR API KEYS HERE FOR "NO SETUP REQUIRED" LAUNCH
@@ -562,12 +562,15 @@ async function startStudioListen() {
   $('studioStatus').style.color = 'var(--moss)';
   appendStudioLog('🎧 Started listening for Studio messages…');
   try {
-    const since = Math.floor(Date.now()/1000)-5;
+    let lastEventId = '';
     let backoff = 2;
     let errCount = 0;
+    appendStudioLog('🎧 Polling ntfy.sh every 2s for new messages…');
     while(studioListenActive) {
       try {
-        const res = await fetch('https://ntfy.sh/'+topic+'/json?since='+since+'&poll=1&r='+Math.random().toString(36).slice(2), { signal: studioAbort.signal, cache:'no-store' });
+        // Simple poll (no streaming) — returns immediately with any messages since lastId.
+        const url = 'https://ntfy.sh/'+topic+'/json?since='+(lastEventId||'all')+'&r='+Math.random().toString(36).slice(2);
+        const res = await fetch(url, { signal: studioAbort.signal, cache:'no-store' });
         if (res.status === 429 || res.status >= 500) {
           errCount++;
           appendStudioLog('⚠ Server busy ('+res.status+') retrying in '+backoff+'s…', 'amber');
@@ -575,16 +578,24 @@ async function startStudioListen() {
           backoff = Math.min(backoff*2, 30);
           continue;
         }
-        if (!res.ok) { await new Promise(r=>setTimeout(r,3000)); continue; }
+        if (!res.ok) {
+          errCount++;
+          appendStudioLog('⚠ HTTP '+res.status+' retrying…', 'amber');
+          await new Promise(r=>setTimeout(r, backoff*1000));
+          backoff = Math.min(backoff*2, 30);
+          continue;
+        }
         errCount = 0; backoff = 2;
         const text = await res.text();
         for (const line of text.split('\n')) {
           if (line.length < 5) continue;
           try {
             const evt = JSON.parse(line);
-            if (evt.event !== 'message') continue;
+            if (evt.event === 'open') continue;
+            if (evt.id) lastEventId = evt.id;
+            if (evt.event && evt.event !== 'message') continue;
             const tags = evt.tags || '';
-            if (tags.includes('inbox')) continue;
+            if (tags.includes('inbox')) continue; // skip our own sent scripts
             const body = evt.message || '';
             let data;
             try { data = JSON.parse(body); } catch { data = null; }
@@ -605,18 +616,20 @@ async function startStudioListen() {
               } else {
                 appendStudioLog('📩 '+data.kind+': '+(data.data||'').slice(0,200), 'moss');
               }
-            } else {
-              appendStudioLog('📩 Unknown: '+body.slice(0,120));
+            } else if (body && !body.startsWith('{')) {
+              // raw pipe-delimited messages from older plugin versions
+              appendStudioLog('📩 Message: '+body.slice(0,120));
             }
-          } catch(e) { /* ignore bad json */ }
+          } catch(e) { /* ignore bad json lines */ }
         }
       } catch(e) {
         if (e.name === 'AbortError') throw e;
         errCount++;
-        appendStudioLog('⚠ Fetch error: '+e.message+' retrying…', 'amber');
+        appendStudioLog('⚠ Fetch error: '+e.message+' — is an ad-blocker blocking ntfy.sh? Retrying in '+backoff+'s…', 'red');
         await new Promise(r=>setTimeout(r, backoff*1000));
         backoff = Math.min(backoff*2, 30);
       }
+      await new Promise(r=>setTimeout(r,2000));
     }
   } catch(e) {
     if (e.name !== 'AbortError') {
