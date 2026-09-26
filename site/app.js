@@ -279,7 +279,10 @@ async function _llmCall(messages, opts, retrying) {
   };
   if (opts.max_tokens) body.max_tokens=opts.max_tokens;
   const headers = { 'Content-Type':'application/json' };
-  headers['Authorization'] = 'Bearer ' + (isPollinations ? (key && key !== 'pollinations-free' ? key : 'free') : key);
+  // For Pollinations anonymous mode, DON'T send Authorization at all (sending "free" triggers 401)
+  if (!(isPollinations && (!key || key==='pollinations-free'))) {
+    headers['Authorization'] = 'Bearer ' + key;
+  }
   headers['HTTP-Referer'] = location.href;
   headers['X-Title']='DevAI';
   const res = await fetch(state.llmUrl + '/chat/completions', {
