@@ -1,5 +1,6 @@
 // DevAI Web App — single-file JS, no framework, no build step.
 // All state lives in localStorage. All provider calls go directly from the browser.
+const APP_VERSION = 9; // bump to force localStorage reset
 
 // ============================================================================
 // ⚔ DEVAI CONFIG — PASTE YOUR API KEYS HERE FOR "NO SETUP REQUIRED" LAUNCH
@@ -172,6 +173,16 @@ const state = {
 // ---------- persistence ----------
 function load() {
   try {
+    // Wipe state if the app was updated (prevents stale broken keys/models from sticking)
+    const storedVersion = parseInt(localStorage.getItem('devai_version') || '0', 10);
+    if (storedVersion < APP_VERSION) {
+      // Preserve session code + project memory so user doesn't lose those
+      const old = JSON.parse(localStorage.getItem('devai_state') || '{}');
+      const keep = { sessionCode: old.sessionCode, memory: old.memory };
+      localStorage.removeItem('devai_state');
+      Object.assign(state, keep);
+      localStorage.setItem('devai_version', String(APP_VERSION));
+    }
     const s = JSON.parse(localStorage.getItem('devai_state') || '{}');
     Object.assign(state, s);
   } catch(e){}
@@ -422,6 +433,19 @@ $('chatInput').addEventListener('keydown', (e)=>{
   if (e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendChat(); }
 });
 $('clearChat').addEventListener('click', ()=>{ chatList.innerHTML=''; });
+$('resetConn').addEventListener('click', ()=>{
+  localStorage.removeItem('devai_state');
+  localStorage.setItem('devai_version', String(APP_VERSION));
+  state.llmUrl=CONFIG.DEFAULT_LLM_URL;
+  state.llmModel=CONFIG.DEFAULT_MODEL;
+  state.llmKey='';
+  state.meshyKey='';
+  save();
+  refreshSettingsUI();
+  buildChatModelPicker();
+  toast('🔄 Reset — using free Pollinations.');
+  location.reload();
+});
 
 // ---------- 3D MODELS (Meshy) ----------
 const MESHY_BASE='https://api.meshy.ai';
