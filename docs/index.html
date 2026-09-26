@@ -421,8 +421,11 @@ iframe.model-viewer { width:100%; height:400px; border:none; border-radius:8px; 
         <h3 style="color:var(--gold-light); margin-top:0;">LLM (Chat / Code / GUI)</h3>
         <label>Provider preset</label>
         <select id="setPreset">
-          <optgroup label="🆓 100% FREE — Coding (best for DevAI scripts)">
-            <option value="https://openrouter.ai/api/v1|qwen/qwen3-coder:free">🆓 Qwen3 Coder (best code, 1M ctx) ← recommended</option>
+          <optgroup label="🆓 100% FREE — No key required (instant)">
+            <option value="https://text.pollinations.ai/openai/v1|openai" selected>⚡ Pollinations AI (default, no signup, no key)</option>
+          </optgroup>
+          <optgroup label="🆓 100% FREE — Coding (best for DevAI scripts, needs free OpenRouter key)">
+            <option value="https://openrouter.ai/api/v1|qwen/qwen3-coder:free">🆓 Qwen3 Coder (best code, 1M ctx)</option>
             <option value="https://openrouter.ai/api/v1|poolside/laguna-m.1:free">🆓 Poolside Laguna M.1 (agentic coding, 262k)</option>
             <option value="https://openrouter.ai/api/v1|cohere/north-mini-code:free">🆓 Cohere North Mini Code (terminal/agent coding, 256k)</option>
             <option value="https://api.groq.com/openai/v1|llama-3.3-70b-versatile">🆓 Groq Llama 3.3 70B (⚡ fastest)</option>

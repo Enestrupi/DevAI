@@ -15,17 +15,18 @@
 // Key is split to avoid naive bot scanners that grep for the literal prefix.
 // This is NOT strong encryption — it only slows down the laziest scrapers.
 // If you care about real key safety, use a Cloudflare Worker proxy (see README).
+// Default is Pollinations (100% free, no key, no sign-up). Override by setting DEFAULT_LLM_KEY.
 const _K = [
-  "sk-or-v1-04fd7392a",
-  "efffc4616a872ced3db21",
-  "5fd0d31e750b39758ae7f",
-  "d18e48a5b2df7",
+  "",
+  "",
+  "",
+  "",
 ];
 const CONFIG = {
-  DEFAULT_LLM_KEY:  _K.join(""),   // paste your sk-or-v1-... (OpenRouter) key here
+  DEFAULT_LLM_KEY:  _K.join("") || "pollinations-free",   // pollinations-free = built-in zero-key mode
   DEFAULT_MESHY_KEY:"",            // paste your msy_... (Meshy) key here (optional)
-  DEFAULT_MODEL:    "qwen/qwen3-coder:free",  // model to use on first visit
-  DEFAULT_LLM_URL:  "https://openrouter.ai/api/v1",
+  DEFAULT_MODEL:    "openai",      // Pollinations free routing (GPT-level)
+  DEFAULT_LLM_URL:  "https://text.pollinations.ai/openai/v1",  // 100% free, no key
 };
 // ============================================================================
 
@@ -81,9 +82,13 @@ const PRESETS = {
     label:'OpenRouter Free (auto)', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
     free:true, note:'OpenRouter picks whichever free model is available. Handy fallback if a specific model is rate-limited.'
   },
+  'https://text.pollinations.ai/openai/v1|openai': {
+    label:'Pollinations AI (no key)', signup:'', signupUrl:'',
+    free:true, nokey:true, note:'⚡ DEFAULT — 100% free, no signup, no API key. Community-served; may be slower during peak hours. Powered by open models.'
+  },
   'https://openrouter.ai/api/v1|meta-llama/llama-3.1-8b-instruct:free': {
-    label:'Llama 3.1 8B (default)', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
-    free:true, note:'Lightweight default — works instantly, rarely rate-limited. Upgrade to Qwen3 Coder for harder scripts.'
+    label:'Llama 3.1 8B', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
+    free:true, note:'Lightweight fallback. Requires a free OpenRouter key. Rarely rate-limited.'
   },
   'http://localhost:11434/v1|llama3.1': {
     label:'Ollama (local)', signup:'', signupUrl:'',
@@ -117,8 +122,8 @@ const PRESETS = {
 };
 
 const state = {
-  llmUrl: 'https://openrouter.ai/api/v1',
-  llmModel: 'meta-llama/llama-3.1-8b-instruct:free', // upgraded from Qwen recommendation via UI if desired
+  llmUrl: CONFIG.DEFAULT_LLM_URL,
+  llmModel: CONFIG.DEFAULT_MODEL,
   llmKey: '',
   meshyKey: '',
   memory: { game:'', currency:'', mainUI:'', admin:'', extra:'' },
@@ -132,25 +137,24 @@ function load() {
     const s = JSON.parse(localStorage.getItem('devai_state') || '{}');
     Object.assign(state, s);
   } catch(e){}
-  // If no key is saved in localStorage but CONFIG has one baked in, use the CONFIG default.
-  if ((!state.llmKey || state.llmKey.length === 0) && CONFIG.DEFAULT_LLM_KEY && CONFIG.DEFAULT_LLM_KEY.length > 5) {
+  // Treat saved key of "pollinations-free" as meaning "use default free service"
+  if (state.llmKey === 'pollinations-free') state.llmKey = '';
+  // If no key is saved in localStorage but CONFIG has a baked-in key, use it.
+  if (CONFIG.DEFAULT_LLM_KEY && CONFIG.DEFAULT_LLM_KEY !== 'pollinations-free' && (!state.llmKey || state.llmKey.length === 0) && CONFIG.DEFAULT_LLM_KEY.length > 5) {
     state.llmKey = CONFIG.DEFAULT_LLM_KEY;
-    state.usedDefaultKey = true; // flag so the UI can show "using built-in key"
+    state.usedDefaultKey = true;
   }
+  // Pollinations works without a key
+  const isPoll = state.llmUrl && state.llmUrl.indexOf('pollinations.ai') !== -1;
+  if (!state.llmKey && isPoll) state.llmKey = 'pollinations-free';
   if ((!state.meshyKey || state.meshyKey.length === 0) && CONFIG.DEFAULT_MESHY_KEY && CONFIG.DEFAULT_MESHY_KEY.length > 5) {
     state.meshyKey = CONFIG.DEFAULT_MESHY_KEY;
     state.usedDefaultMeshy = true;
   }
-  // Seed default model/URL from CONFIG if nothing is saved yet
-  if (CONFIG.DEFAULT_MODEL && (!state.llmModel || state.llmModel === 'meta-llama/llama-3.1-8b-instruct:free')) {
-    // only override if still at factory default AND user hasn't changed model via Settings
-    const saved = JSON.parse(localStorage.getItem('devai_state') || '{}');
-    if (!saved.llmModel) state.llmModel = CONFIG.DEFAULT_MODEL;
-  }
-  if (CONFIG.DEFAULT_LLM_URL && (!state.llmUrl || state.llmUrl === 'https://openrouter.ai/api/v1')) {
-    const saved = JSON.parse(localStorage.getItem('devai_state') || '{}');
-    if (!saved.llmUrl) state.llmUrl = CONFIG.DEFAULT_LLM_URL;
-  }
+  // Seed default model/URL from CONFIG if nothing saved
+  const saved = JSON.parse(localStorage.getItem('devai_state') || '{}');
+  if (!saved.llmUrl) state.llmUrl = CONFIG.DEFAULT_LLM_URL;
+  if (!saved.llmModel) state.llmModel = CONFIG.DEFAULT_MODEL;
 }
 function save() {
   localStorage.setItem('devai_state', JSON.stringify({
@@ -222,7 +226,11 @@ document.querySelectorAll('nav button[data-page]').forEach(btn=>{
 
 // ---------- LLM call ----------
 async function llmCall(messages, opts={}) {
-  if (!state.llmKey) throw new Error('No LLM API key configured. Add one in Settings.');
+  const isPollinations = state.llmUrl && state.llmUrl.indexOf('pollinations.ai') !== -1;
+  const key = state.llmKey || '';
+  if (!isPollinations && (!key || key === 'pollinations-free')) {
+    throw new Error('No LLM API key configured. Add one in Settings, or switch to Pollinations (free, no key).');
+  }
   const body = {
     model: state.llmModel,
     messages: messages,
@@ -230,14 +238,14 @@ async function llmCall(messages, opts={}) {
     stream: false,
   };
   if (opts.max_tokens) body.max_tokens=opts.max_tokens;
+  const headers = { 'Content-Type':'application/json' };
+  // Pollinations works with or without auth; send a harmless dummy to keep OpenAI SDKs happy
+  headers['Authorization'] = 'Bearer ' + (isPollinations ? (key && key !== 'pollinations-free' ? key : 'free') : key);
+  headers['HTTP-Referer'] = location.href;
+  headers['X-Title']='DevAI';
   const res = await fetch(state.llmUrl + '/chat/completions', {
     method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'Authorization':'Bearer '+state.llmKey,
-      'HTTP-Referer': location.href,
-      'X-Title':'DevAI',
-    },
+    headers,
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -588,11 +596,11 @@ function refreshSettingsUI() {
   $('setExtra').value=state.memory.extra||'';
   $('sessionCode').value=state.sessionCode||'';
   // preset dropdown
-  const preset=state.llmUrl+'|'+state.llmModel;
+  const presetVal=state.llmUrl+'|'+state.llmModel;
   const sel=$('setPreset');
   let found=false;
   for (const o of sel.options){
-    if (o.value===preset){ o.selected=true; found=true; break; }
+    if (o.value===presetVal){ o.selected=true; found=true; break; }
   }
   if (!found){
     sel.value='custom';
@@ -605,9 +613,13 @@ function refreshSettingsUI() {
   updatePresetHint();
   // conn status
   const cs=$('connStatus');
-  if (state.llmKey){
-    const preset=PRESETS[state.llmUrl+'|'+state.llmModel];
-    const name = preset?preset.label:state.llmModel;
+  const isPoll = state.llmUrl && state.llmUrl.indexOf('pollinations.ai') !== -1;
+  const preset=PRESETS[state.llmUrl+'|'+state.llmModel];
+  const name = preset?preset.label:state.llmModel;
+  if (isPoll && (!state.llmKey || state.llmKey==='pollinations-free')) {
+    cs.textContent='⚡ '+name+' — free, no key needed';
+    cs.className='status ok';
+  } else if (state.llmKey && state.llmKey !== 'pollinations-free') {
     if (state.usedDefaultKey) {
       cs.textContent='⚔ Built-in key active — '+name;
       cs.className='status';
@@ -616,24 +628,27 @@ function refreshSettingsUI() {
       cs.className='status ok';
     }
   } else {
-    cs.textContent='Paste an API key in ⚙ Settings (or edit CONFIG in app.js).';
+    cs.textContent='Pick a model in ⚙ Settings to get started.';
     cs.className='status';
   }
-  $('chatModelLabel').textContent=state.llmKey ? (PRESETS[state.llmUrl+'|'+state.llmModel]?.label || state.llmModel) : 'no key';
+  $('chatModelLabel').textContent = name;
 }
 function updatePresetHint() {
   const v=$('setPreset').value;
   const hint=$('llmKeyHint');
   if(v==='custom'){
-    hint.innerHTML='Custom OpenAI-compatible endpoint. Enter base URL + model below.';
+    hint.innerHTML='Custom OpenAI-compatible endpoint. Enter base URL + model below. Key optional only if your endpoint allows anonymous access.';
     return;
   }
   const p=PRESETS[v];
   if(!p){ hint.innerHTML=''; return; }
-  const tag = p.free ? '<span style="color:var(--moss);font-weight:700;">FREE</span>'
+  const tag = p.local ? '<span style="color:var(--moss);font-weight:700;">LOCAL</span>'
+            : p.free && p.nokey ? '<span style="color:var(--green);font-weight:700;">NO KEY</span>'
+            : p.free ? '<span style="color:var(--moss);font-weight:700;">FREE</span>'
             : p.paid ? '<span style="color:var(--red);font-weight:700;">PAID</span>'
             : '<span style="color:var(--amber);font-weight:700;">PAYG</span>';
-  const link = p.signupUrl ? ' Get key: <a href="'+p.signupUrl+'" target="_blank" style="color:var(--amber);">'+p.signup+'</a>.' : '';
+  const link = p.signupUrl && !p.nokey ? ' Get key: <a href="'+p.signupUrl+'" target="_blank" style="color:var(--amber);">'+p.signup+'</a>.'
+              : p.nokey ? ' No signup — works instantly.' : '';
   hint.innerHTML = tag + ' — ' + p.note + link;
 }
 $('setPreset').addEventListener('change',()=>{
