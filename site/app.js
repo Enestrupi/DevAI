@@ -1,6 +1,6 @@
 // DevAI Web App — single-file JS, no framework, no build step.
 // All state lives in localStorage. All provider calls go directly from the browser.
-const APP_VERSION = 16;
+const APP_VERSION = 17;
 
 // ============================================================================
 // ⚔ DEVAI CONFIG — PASTE YOUR API KEYS HERE FOR "NO SETUP REQUIRED" LAUNCH
@@ -506,7 +506,22 @@ function renderMarkdownInto(el, text) {
   }));
 }
 
-// ---------- SEND TO STUDIO (ntfy.sh free pub/sub — no backend, no signup) ----------
+// ---------- SEND TO STUDIO (ntfy pub/sub — multiple hosts for ad-blocker resilience) ----------
+const NTFY_HOSTS = ['https://ntfy.envs.net','https://ntfy.sh']; // envs.net first (less likely blocked)
+function ntfyUrl(host, topic, extra='') { return host+'/'+topic+extra; }
+
+async function ntfyPost(topic, body, headers={}) {
+  let lastErr;
+  for (const host of NTFY_HOSTS) {
+    try {
+      const res = await fetch(ntfyUrl(host,topic), { method:'POST', body, headers });
+      if (res.ok) return res;
+      lastErr = 'HTTP '+res.status;
+    } catch(e) { lastErr = e.message; }
+  }
+  throw new Error('All relay hosts failed: '+lastErr+'. Try disabling your ad-blocker on this site.');
+}
+
 async function sendToStudio(preId, titleOverride, typeOverride) {
   const code = (preId && $(preId)?.innerText) || $('codeBlock')?.innerText || $('guiCode')?.innerText || $('animCode')?.innerText || '';
   if(!code) { toast('No code to send. Generate a script first.'); return; }
@@ -517,7 +532,6 @@ async function sendToStudio(preId, titleOverride, typeOverride) {
   const target = stype === 'LocalScript' ? 'StarterPlayerScripts'
                : stype === 'ModuleScript' ? 'ReplicatedStorage'
                : 'ServerScriptService';
-  // Pipe-delimited: TITLE|TYPE|TARGET|BODY — pipe only appears as separator since title/type/target have no pipes
   const message = title+'|'+stype+'|'+target+'|'+code;
   if (message.length > 3900) {
     toast('⚠ Script too long (>4KB). Copy and paste instead.');
@@ -525,12 +539,7 @@ async function sendToStudio(preId, titleOverride, typeOverride) {
   }
   const topic = 'devai-' + sess.toLowerCase();
   try {
-    const res = await fetch('https://ntfy.sh/'+topic, {
-      method:'POST', body: message,
-      headers: { 'Title':'DevAI: '+title, 'Tags':'robot,inbox' },
-    });
-    if (!res.ok) throw new Error('HTTP '+res.status);
-    // Auto-start listener if not running so user sees responses
+    await ntfyPost(topic, message, { 'Title':'DevAI: '+title, 'Tags':'robot,inbox' });
     if (!studioListenActive) startStudioListen();
     toast('📤 Sent to Studio! Should auto-insert in 1-2 seconds.');
     appendStudioLog('📤 OUT → Studio: '+title+' ('+stype+')', 'moss');
@@ -565,24 +574,26 @@ async function startStudioListen() {
     let lastEventId = '';
     let backoff = 2;
     let errCount = 0;
-    appendStudioLog('🎧 Polling ntfy.sh every 2s for new messages…');
+    let hostIdx = 0;
+    appendStudioLog('🎧 Polling for messages (relay: '+NTFY_HOSTS[hostIdx].replace('https://','')+')…');
     while(studioListenActive) {
+      const host = NTFY_HOSTS[hostIdx % NTFY_HOSTS.length];
       try {
-        // Simple poll (no streaming) — returns immediately with any messages since lastId.
-        const url = 'https://ntfy.sh/'+topic+'/json?since='+(lastEventId||'all')+'&r='+Math.random().toString(36).slice(2);
+        const url = ntfyUrl(host, topic, '/json?since='+(lastEventId||'all')+'&r='+Math.random().toString(36).slice(2)+'&poll=0');
         const res = await fetch(url, { signal: studioAbort.signal, cache:'no-store' });
         if (res.status === 429 || res.status >= 500) {
           errCount++;
-          appendStudioLog('⚠ Server busy ('+res.status+') retrying in '+backoff+'s…', 'amber');
-          await new Promise(r=>setTimeout(r, backoff*1000));
-          backoff = Math.min(backoff*2, 30);
+          appendStudioLog('⚠ '+host.replace('https://','')+' busy ('+res.status+'), switching host…', 'amber');
+          hostIdx++;
+          await new Promise(r=>setTimeout(r, 1000));
           continue;
         }
         if (!res.ok) {
           errCount++;
-          appendStudioLog('⚠ HTTP '+res.status+' retrying…', 'amber');
+          appendStudioLog('⚠ HTTP '+res.status+' from '+host.replace('https://','')+', trying next host…', 'amber');
+          hostIdx++;
           await new Promise(r=>setTimeout(r, backoff*1000));
-          backoff = Math.min(backoff*2, 30);
+          backoff = Math.min(backoff*2, 15);
           continue;
         }
         errCount = 0; backoff = 2;
@@ -595,7 +606,7 @@ async function startStudioListen() {
             if (evt.id) lastEventId = evt.id;
             if (evt.event && evt.event !== 'message') continue;
             const tags = evt.tags || '';
-            if (tags.includes('inbox')) continue; // skip our own sent scripts
+            if (tags.includes('inbox')) continue;
             const body = evt.message || '';
             let data;
             try { data = JSON.parse(body); } catch { data = null; }
@@ -617,7 +628,6 @@ async function startStudioListen() {
                 appendStudioLog('📩 '+data.kind+': '+(data.data||'').slice(0,200), 'moss');
               }
             } else if (body && !body.startsWith('{')) {
-              // raw pipe-delimited messages from older plugin versions
               appendStudioLog('📩 Message: '+body.slice(0,120));
             }
           } catch(e) { /* ignore bad json lines */ }
@@ -625,9 +635,10 @@ async function startStudioListen() {
       } catch(e) {
         if (e.name === 'AbortError') throw e;
         errCount++;
-        appendStudioLog('⚠ Fetch error: '+e.message+' — is an ad-blocker blocking ntfy.sh? Retrying in '+backoff+'s…', 'red');
+        appendStudioLog('⚠ Can\'t reach '+host.replace('https://','')+' — ad-blocker? Trying next host in '+backoff+'s…', errCount<2?'amber':'red');
+        hostIdx++;
         await new Promise(r=>setTimeout(r, backoff*1000));
-        backoff = Math.min(backoff*2, 30);
+        backoff = Math.min(backoff*2, 15);
       }
       await new Promise(r=>setTimeout(r,2000));
     }

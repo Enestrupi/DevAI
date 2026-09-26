@@ -15,7 +15,7 @@ local toolbar = plugin:CreateToolbar("DevAI")
 local button = toolbar:CreateButton("DevAI", "Open DevAI AI Co-Developer", "rbxassetid://17870407023")
 local widgetInfo = DockWidgetPluginGuiInfo.new(Enum.InitialDockState.Float, true, false, 540, 620, 360, 400)
 local gui = plugin:CreateDockWidgetPluginGui("DevAI_v3", widgetInfo)
-gui.Title = "DevAI v3.2 — Studio ↔ Website"
+gui.Title = "DevAI v3.3 — Studio ↔ Website"
 
 button.Click:Connect(function() gui.Enabled = not gui.Enabled end)
 
@@ -157,16 +157,12 @@ local function postToWebsite(payload)
 	if not connected or topic == "" then setStatus("⚠ Not connected.", C.red); return false end
 	local body = HttpService:JSONEncode(payload)
 	if #body > 3500 then
-		-- Truncate long explorer snapshots
-		payload.data = payload.data:sub(1,3200).."\n... (truncated, too long for push)"
+		payload.data = payload.data:sub(1,3200).."\n... (truncated)"
 		body = HttpService:JSONEncode(payload)
 	end
-	local ok, err = pcall(function()
-		return HttpService:PostAsync("https://ntfy.sh/"..topic, body, Enum.HttpContentType.ApplicationJson, false,
-			{["Title"]="DevAI:"..payload.kind, ["Tags"]="robot,outbox"})
-	end)
+	local ok, err = ntfyPost(topic, body, {["Title"]="DevAI:"..payload.kind, ["Tags"]="robot,outbox"})
 	if ok then setStatus("📤 Sent "..payload.kind.." to website.", C.moss); return true
-	else setStatus("❌ Send failed: "..tostring(err), C.red); return false end
+	else setStatus("❌ Send failed (check HttpService?): "..tostring(err), C.red); return false end
 end
 
 -- Add a log entry (incoming or outgoing)
@@ -235,7 +231,34 @@ local function insertScript(title, body, stype, target)
 	pcall(function() setclipboard(body or "") end)
 end
 
--- Polling loop
+-- Multiple ntfy hosts for ad-blocker / regional resilience (Roblox HttpService respects DNS, no ad-blocker on client side, but some ISPs block ntfy.sh)
+local NTFY_HOSTS = {"https://ntfy.envs.net", "https://ntfy.sh"}
+
+local function ntfyPost(topic, body, extraHeaders)
+	local errs = {}
+	for _, host in ipairs(NTFY_HOSTS) do
+		local url = host.."/"..topic
+		local ok, resp = pcall(function()
+			local headers = {["Content-Type"]="text/plain"}
+			if extraHeaders then for k,v in pairs(extraHeaders) do headers[k]=v end end
+			return HttpService:PostAsync(url, body, Enum.HttpContentType.TextPlain, false, headers)
+		end)
+		if ok then return true, resp end
+		table.insert(errs, host..": "..tostring(resp))
+	end
+	return false, table.concat(errs, "; ")
+end
+
+local function ntfyGet(topic, suffix)
+	for _, host in ipairs(NTFY_HOSTS) do
+		local url = host.."/"..topic..suffix
+		local ok, resp = pcall(function() return HttpService:GetAsync(url, true) end)
+		if ok and resp then return true, resp end
+	end
+	return false, nil
+end
+
+-- Polling loop control
 local function stopPolling()
 	if pollTask then task.cancel(pollTask); pollTask=nil end
 	connected=false
@@ -264,13 +287,8 @@ local function startPolling(code)
 		local consecutiveErrors = 0
 		local lastEventId = ""
 		while connected do
-			-- Simple poll every 2s (no streaming). since=<id> returns only new messages.
-			local url = "https://ntfy.sh/"..topic.."/json?since="
-			if lastEventId ~= "" then url = url..lastEventId else url = url.."all" end
-			url = url.."&r="..tostring(math.random(100000,999999))
-			local ok, resp = pcall(function()
-				return HttpService:GetAsync(url, true)
-			end)
+			local suffix = "/json?since="..(lastEventId~="" and lastEventId or "all").."&r="..tostring(math.random(100000,999999)).."&poll=0"
+			local ok, resp = ntfyGet(topic, suffix)
 			if ok and resp then
 				consecutiveErrors = 0
 				backoff = 2
@@ -302,7 +320,7 @@ local function startPolling(code)
 			else
 				consecutiveErrors = consecutiveErrors+1
 				if consecutiveErrors <= 3 or consecutiveErrors % 10 == 0 then
-					setStatus("⚠ Network error (HttpService enabled? check Game Settings → Security). Retry in "..backoff.."s…", consecutiveErrors<=3 and C.amber or C.red)
+					setStatus("⚠ Can't reach relay (HttpService on? Game Settings → Security → Allow HTTP). Retry "..backoff.."s…", consecutiveErrors<=3 and C.amber or C.red)
 				end
 				task.wait(backoff)
 				backoff = math.min(backoff*2, 30)
