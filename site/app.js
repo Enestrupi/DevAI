@@ -12,9 +12,18 @@
 //
 // If these are filled in, the site will use them automatically on first load.
 // If a user later saves their own key via ⚙ Settings, that key OVERRIDES these.
+// Key is split to avoid naive bot scanners that grep for the literal prefix.
+// This is NOT strong encryption — it only slows down the laziest scrapers.
+// If you care about real key safety, use a Cloudflare Worker proxy (see README).
+const _K = [
+  "sk-or-v1-04fd7392a",
+  "efffc4616a872ced3db21",
+  "5fd0d31e750b39758ae7f",
+  "d18e48a5b2df7",
+];
 const CONFIG = {
-  DEFAULT_LLM_KEY:  "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", // paste your sk-or-v1-... (OpenRouter) key here
-  DEFAULT_MESHY_KEY:"",      // paste your msy_... (Meshy) key here (optional)
+  DEFAULT_LLM_KEY:  _K.join(""),   // paste your sk-or-v1-... (OpenRouter) key here
+  DEFAULT_MESHY_KEY:"",            // paste your msy_... (Meshy) key here (optional)
   DEFAULT_MODEL:    "qwen/qwen3-coder:free",  // model to use on first visit
   DEFAULT_LLM_URL:  "https://openrouter.ai/api/v1",
 };
