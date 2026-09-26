@@ -1,6 +1,6 @@
 // DevAI Web App — single-file JS, no framework, no build step.
 // All state lives in localStorage. All provider calls go directly from the browser.
-const APP_VERSION = 18;
+const APP_VERSION = 19;
 
 // ============================================================================
 // ⚔ DEVAI CONFIG — PASTE YOUR API KEYS HERE FOR "NO SETUP REQUIRED" LAUNCH
@@ -507,8 +507,28 @@ function renderMarkdownInto(el, text) {
 }
 
 // ---------- SEND TO STUDIO (ntfy pub/sub — multiple hosts for ad-blocker resilience) ----------
-const NTFY_HOSTS = ['https://ntfy.envs.net','https://ntfy.sh']; // envs.net first (less likely blocked)
+const NTFY_HOSTS = [
+  'https://ntfy.nerdvpn.de',   // fastest (0.3s, Germany)
+  'https://ntfy.envs.net',     // reliable (USA)
+  'https://ntfy.sh',           // main — often ad-blocked
+];
 function ntfyUrl(host, topic, extra='') { return host+'/'+topic+extra; }
+
+// Test which relay host works in THIS browser (CORS/connectivity check)
+async function testRelayHosts() {
+  const results = [];
+  for (const host of NTFY_HOSTS) {
+    const start = performance.now();
+    let ok=false, err='';
+    try {
+      const res = await fetch(host+'/devai-conntest?r='+Math.random(), { cache:'no-store', signal: AbortSignal.timeout(8000) });
+      ok = res.ok || res.status === 404 || res.status === 400; // any response means host is reachable
+    } catch(e) { err = e.message; }
+    const ms = Math.round(performance.now()-start);
+    results.push({host:host.replace('https://',''), ok, ms, err});
+  }
+  return results;
+}
 
 async function ntfyPost(topic, body, headers={}) {
   let lastErr;
@@ -519,7 +539,7 @@ async function ntfyPost(topic, body, headers={}) {
       lastErr = 'HTTP '+res.status;
     } catch(e) { lastErr = e.message; }
   }
-  throw new Error('All relay hosts failed: '+lastErr+'. Try disabling your ad-blocker on this site.');
+  throw new Error('All relay hosts failed ('+lastErr+'). Try disabling your ad-blocker on this site, or use Manual Paste mode (click a script\'s "📋 Copy" button and paste into Studio).');
 }
 
 async function sendToStudio(preId, titleOverride, typeOverride) {
@@ -739,40 +759,47 @@ $('meshGenerate').addEventListener('click', async ()=>{
 
   // Hunyuan3D "no key" mode: generate 4 turntable views via Pollinations image API
   if (provider === 'hunyuan') {
-    setStatus('meshStatus','Generating 4-view turntable via Hunyuan3D/Pollinations (no key, ~15s)…','warn');
+    setStatus('meshStatus','Generating 4-view turntable (no key, ~30s total)…','warn');
     $('meshProgress').style.display='block';
-    $('meshProgress').firstElementChild.style.width='10%';
+    $('meshProgress').firstElementChild.style.width='5%';
+    $('meshPreview').style.display='block';
+    $('meshPreview').scrollIntoView({behavior:'smooth',block:'nearest'});
+    $('meshPreviewBody').innerHTML = '<div id="turntableGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;"></div>';
+    const grid = $('turntableGrid');
     const views = [
       {label:'Front view',  angle:'front view, facing camera'},
       {label:'Right side',  angle:'right side view, profile'},
       {label:'Back view',   angle:'back view, from behind'},
-      {label:'3/4 view',    angle:'three-quarter view, 45 degrees'},
+      {label:'3/4 view',    angle:'three-quarter view, 45 degree angle'},
     ];
-    const urls = [];
     for (let i=0;i<views.length;i++){
       const v = views[i];
-      const p = encodeURIComponent(prompt+', ancient fantasy bronze gold mossy stone aesthetic, 3D game asset, white background, studio lighting, '+v.angle+', '+style);
+      const cell = document.createElement('div');
+      cell.style.cssText='text-align:center;';
+      cell.innerHTML=`<div style="background:#1a1a1a;border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;height:220px;color:var(--text-faint);font-size:11px;">⏳ Generating ${v.label}…</div><div class="tiny" style="color:var(--text-dim);margin-top:4px">${v.label}</div>`;
+      grid.appendChild(cell);
+      const p = encodeURIComponent(prompt+', 3D game asset, white background, studio lighting, '+v.angle+', '+style+' style');
       const seed = Math.floor(Math.random()*99999);
-      urls.push({label:v.label, url:`https://image.pollinations.ai/prompt/${p}?width=512&height=512&seed=${seed}&nologo=true&model=flux`});
-      $('meshProgress').firstElementChild.style.width = (20 + i*20)+'%';
-      // Wait a tiny bit so requests start (images will lazy-load)
-      await new Promise(r=>setTimeout(r,200));
+      const url = `https://image.pollinations.ai/prompt/${p}?width=512&height=512&seed=${seed}&nologo=true&model=flux&enhance=true`;
+      $('meshProgress').firstElementChild.style.width = Math.round((i+0.5)/views.length*100)+'%';
+      // Fetch as blob so it works even if <img> CORS is weird (converts to object URL in our origin)
+      fetch(url).then(res=>{ if(!res.ok) throw new Error('HTTP '+res.status); return res.blob(); })
+        .then(blob=>{
+          const objUrl = URL.createObjectURL(blob);
+          cell.innerHTML=`<img src="${objUrl}" alt="${v.label}" style="width:100%;border-radius:8px;border:1px solid var(--border);background:#111;"/><div class="tiny" style="color:var(--text-dim);margin-top:4px">${v.label}</div>`;
+        })
+        .catch(err=>{
+          cell.innerHTML=`<div style="padding:40px;background:#2a1a1a;border-radius:8px;color:#e88;border:1px solid #c44;font-size:11px;height:220px;display:flex;align-items:center;justify-content:center;text-align:center;">❌ Blocked by ad-blocker<br><small>(${err.message})</small></div><div class="tiny" style="color:var(--text-dim);margin-top:4px">${v.label}</div>`;
+        });
+      await new Promise(r=>setTimeout(r,500));
     }
     $('meshProgress').firstElementChild.style.width='100%';
-    // Render a 2x2 turntable grid
-    // Preload images and wait for them to load so the user sees them appear
-    setStatus('meshStatus','Drawing views (images load from Pollinations, ~5s each)…','warn');
-    const html = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
-      ${urls.map(u=>`<div style="text-align:center"><img src="${u.url}" alt="${u.label}" loading="lazy" referrerpolicy="no-referrer" style="width:100%;border-radius:8px;border:1px solid var(--border);background:#1a1a1a;min-height:200px;" onload="this.style.opacity=1" onerror="this.replaceWith(Object.assign(document.createElement('div'),{style:'padding:40px;background:#222;border-radius:8px;color:#888;font-size:12px',textContent:'Image blocked by ad-blocker'}))"/><div class="tiny" style="color:var(--text-dim);margin-top:4px">${u.label}</div></div>`).join('')}
-    </div>
-    <p class="tiny" style="margin-top:10px;color:var(--amber)">
-      ⚠ <b>This is a 4-view turntable preview (no-key mode).</b> These are AI-generated views of your model — use them as reference to build the model in Studio, or switch provider to <b>Meshy</b> in Settings to get a real downloadable <code>.glb</code>/<code>.fbx</code> file (100 free credits/month — Google signup, no credit card).
-    </p>
-    <p class="tiny" style="color:var(--text-dim)">Images generated by Pollinations (Flux). If images don't load, disable your ad-blocker for this site — ad-blockers often block image.pollinations.ai.</p>`;
-    $('meshPreviewBody').innerHTML = html;
-    $('meshPreview').style.display='block';
-    $('meshPreview').scrollIntoView({behavior:'smooth',block:'nearest'});
-    setStatus('meshStatus','✓ 4-view turntable ready (no-key mode).','ok');
+    const note = document.createElement('div');
+    note.innerHTML = `<p class="tiny" style="color:var(--amber);margin:10px 0 4px;">
+      ⚠ <b>4-view turntable preview (no-key mode).</b> These are AI reference views. For a real <code>.glb</code>/<code>.fbx</code> mesh, switch provider to <b>Meshy</b> in Settings (100 free/month, Google signup, no card: <a href="https://www.meshy.ai/settings/api" target="_blank" style="color:var(--amber)">meshy.ai/settings/api</a>).
+    </p><p class="tiny" style="color:var(--text-faint);margin:0;">If cells show red errors, disable your ad-blocker for this site.</p>`;
+    $('meshPreviewBody').appendChild(note);
+    setStatus('meshStatus','✓ Generating views (each appears as it finishes, ~10s per view)','ok');
     return;
   }
 
@@ -1161,6 +1188,24 @@ $('genSession').addEventListener('click', ()=>{ genSessionCode(); if(studioListe
 $('copySession').addEventListener('click',()=>copyText($('sessionCode').value));
 $('startListen').addEventListener('click', startStudioListen);
 $('clearCtx').addEventListener('click', ()=>{ $('studioContext').value=''; toast('Context cleared.'); });
+
+$('testRelay').addEventListener('click', async ()=>{
+  const r = $('relayTestResults');
+  r.innerHTML = '<span style="color:var(--text-dim)">Testing…</span>';
+  const results = await testRelayHosts();
+  r.innerHTML = results.map(x=>{
+    const color = x.ok ? 'var(--moss)' : 'var(--red)';
+    const icon = x.ok ? '✅' : '❌';
+    const detail = x.ok ? `${x.ms}ms` : x.err.slice(0,40);
+    return `<div style="color:${color}">${icon} ${x.host} — ${detail}</div>`;
+  }).join('');
+  const working = results.filter(x=>x.ok).length;
+  if (working === 0) {
+    r.innerHTML += '<div style="color:var(--red);margin-top:6px;font-family:var(--body);font-size:11px;">❌ ALL relays blocked by your ad-blocker/VPN. Disable your ad-blocker on enestrupi.github.io (click the 🛡 shield in the address bar), or use <b>Manual Paste mode</b>: every code block has a 📋 Copy button that copies the script to your clipboard — just paste into Studio.</div>';
+  } else {
+    r.innerHTML += `<div style="color:var(--moss);margin-top:6px;font-family:var(--body);font-size:11px;">✅ ${working}/${results.length} relays reachable. Click "Start listening" then connect the plugin.</div>`;
+  }
+});
 
 // ---------- boot ----------
 load();

@@ -15,7 +15,7 @@ local toolbar = plugin:CreateToolbar("DevAI")
 local button = toolbar:CreateButton("DevAI", "Open DevAI AI Co-Developer", "rbxassetid://17870407023")
 local widgetInfo = DockWidgetPluginGuiInfo.new(Enum.InitialDockState.Float, true, false, 540, 620, 360, 400)
 local gui = plugin:CreateDockWidgetPluginGui("DevAI_v3", widgetInfo)
-gui.Title = "DevAI v3.3 — Studio ↔ Website"
+gui.Title = "DevAI v3.4 — Studio ↔ Website"
 
 button.Click:Connect(function() gui.Enabled = not gui.Enabled end)
 
@@ -231,8 +231,9 @@ local function insertScript(title, body, stype, target)
 	pcall(function() setclipboard(body or "") end)
 end
 
--- Multiple ntfy hosts for ad-blocker / regional resilience (Roblox HttpService respects DNS, no ad-blocker on client side, but some ISPs block ntfy.sh)
-local NTFY_HOSTS = {"https://ntfy.envs.net", "https://ntfy.sh"}
+-- Multiple ntfy hosts for resilience (order = priority). Studio HttpService doesn't run ad-blockers,
+-- but some ISPs/regions block specific domains.
+local NTFY_HOSTS = {"https://ntfy.nerdvpn.de", "https://ntfy.envs.net", "https://ntfy.sh"}
 
 local function ntfyPost(topic, body, extraHeaders)
 	local errs = {}

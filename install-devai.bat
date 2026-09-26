@@ -1,6 +1,6 @@
 @echo off
 echo ========================================================
-echo  DevAI v3.3 Plugin Installer
+echo  DevAI v3.4 Plugin Installer
 echo ========================================================
 echo.
 set PLUGINS_DIR=%LOCALAPPDATA%\Roblox\Plugins
