@@ -432,17 +432,16 @@ function addMsg(who, text, isUser) {
   return div;
 }
 function renderMarkdownInto(el, text) {
-  // basic markdown: ```luau ... ``` code blocks → pre with copy button, `inline` → code, **bold**, newlines → <br>
+  // basic markdown: ```luau ... ``` code blocks → pre with copy + send-to-studio buttons
   let html = text
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/```(?:luau|lua)?\n([\s\S]*?)\n```/g, (m,code)=>{
       const id='cb'+Math.random().toString(36).slice(2,8);
-      return '</p><div class="codewrap"><pre id="'+id+'">'+code.trimEnd()+'</pre><div class="codeblock-toolbar"><button class="btn ghost" data-copy="'+id+'">📋 Copy Luau</button><button class="btn ghost" data-dl="'+id+'">⬇ .lua</button></div></div><p>';
+      return '</p><div class="codewrap"><pre id="'+id+'">'+code.trimEnd()+'</pre><div class="codeblock-toolbar"><button class="btn ghost" data-copy="'+id+'">📋 Copy Luau</button><button class="btn ghost" data-dl="'+id+'">⬇ .lua</button><button class="btn" data-send="'+id+'" style="background:var(--moss);">📤 Send to Studio</button></div></div><p>';
     })
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>')
     .replace(/\n/g,'<br>');
-  // wrap in paragraph
   el.innerHTML = '<p>'+html+'</p>';
   el.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>{
     copyText($(b.dataset.copy).innerText);
@@ -450,6 +449,38 @@ function renderMarkdownInto(el, text) {
   el.querySelectorAll('[data-dl]').forEach(b=>b.addEventListener('click',()=>{
     downloadText('devai-script.lua', $(b.dataset.dl).innerText);
   }));
+  el.querySelectorAll('[data-send]').forEach(b=>b.addEventListener('click',()=>{
+    sendToStudio(b.dataset.send, null, null);
+  }));
+}
+
+// ---------- SEND TO STUDIO (ntfy.sh free pub/sub — no backend, no signup) ----------
+async function sendToStudio(preId, titleOverride, typeOverride) {
+  const code = (preId && $(preId)?.innerText) || $('codeBlock')?.innerText || $('guiCode')?.innerText || $('animCode')?.innerText || '';
+  if(!code) { toast('No code to send. Generate a script first.'); return; }
+  if(!state.sessionCode) genSessionCode();
+  const sess = state.sessionCode;
+  const title = titleOverride || 'DevAI Script';
+  const stype = typeOverride || 'Script';
+  const target = stype === 'LocalScript' ? 'StarterPlayerScripts'
+               : stype === 'ModuleScript' ? 'ReplicatedStorage'
+               : 'ServerScriptService';
+  const message = title+'|'+stype+'|'+target+'|'+code;
+  if (message.length > 3900) {
+    toast('⚠ Script too long (>4KB). Copy and paste instead.');
+    return;
+  }
+  const topic = 'devai-' + sess.toLowerCase();
+  try {
+    const res = await fetch('https://ntfy.sh/'+topic, {
+      method:'POST', body: message,
+      headers: { 'Title':'DevAI: '+title, 'Tags':'robot' },
+    });
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    toast('📤 Sent to Studio! Check the plugin panel.');
+  } catch(e) {
+    toast('❌ Send failed: '+e.message);
+  }
 }
 async function sendChat() {
   const txt=$('chatInput').value.trim();
@@ -702,6 +733,7 @@ $('guiGenerate').addEventListener('click', async ()=>{
 });
 $('guiCopy').addEventListener('click',()=>copyText($('guiCode').textContent));
 $('guiDownload').addEventListener('click',()=>downloadText('DevAI_GUI_LocalScript.lua',$('guiCode').textContent));
+$('guiSend').addEventListener('click',()=>sendToStudio(null, 'DevAI_GUI', 'LocalScript'));
 
 // ---------- Focused Code ----------
 $('codeGenerate').addEventListener('click', async ()=>{
@@ -731,6 +763,7 @@ $('codeDownload').addEventListener('click',()=>downloadText(
   ($('codeName').value||'script').replace(/[^a-zA-Z0-9_]/g,'_')+'.lua',
   $('codeBlock').textContent
 ));
+$('codeSend').addEventListener('click',()=>sendToStudio(null, $('codeName').value||'DevAI_Script', $('codeType')?.value?.includes('Local')?'LocalScript':$('codeType')?.value?.includes('Module')?'ModuleScript':'Script'));
 
 // ---------- Animations ----------
 $('animGen').addEventListener('click', async ()=>{
@@ -751,6 +784,7 @@ $('animGen').addEventListener('click', async ()=>{
 });
 $('animCopy').addEventListener('click',()=>copyText($('animCode').textContent));
 $('animDownload').addEventListener('click',()=>downloadText('AnimationScript.lua',$('animCode').textContent));
+$('animSend').addEventListener('click',()=>sendToStudio(null, 'AnimationController', 'LocalScript'));
 
 // ---------- SETTINGS ----------
 function refreshSettingsUI() {

@@ -316,6 +316,7 @@ iframe.model-viewer { width:100%; height:400px; border:none; border-radius:8px; 
         <div class="btnrow">
           <button class="btn" id="guiCopy">📋 Copy Luau</button>
           <button class="btn ghost" id="guiDownload">⬇ Download .lua</button>
+          <button class="btn" id="guiSend" style="background:var(--moss);">📤 Send to Studio (LocalScript)</button>
         </div>
         <p class="tiny">Put it in <span class="kbd">StarterPlayerScripts</span> as a LocalScript.</p>
       </div>
@@ -357,6 +358,7 @@ iframe.model-viewer { width:100%; height:400px; border:none; border-radius:8px; 
         <div class="btnrow">
           <button class="btn" id="codeCopy">📋 Copy Luau</button>
           <button class="btn ghost" id="codeDownload">⬇ Download .lua</button>
+          <button class="btn" id="codeSend" style="background:var(--moss);">📤 Send to Studio</button>
         </div>
       </div>
     </section>
@@ -384,6 +386,7 @@ iframe.model-viewer { width:100%; height:400px; border:none; border-radius:8px; 
           <div class="btnrow">
             <button class="btn" id="animCopy">📋 Copy</button>
             <button class="btn ghost" id="animDownload">⬇ Download</button>
+            <button class="btn" id="animSend" style="background:var(--moss);">📤 Send to Studio (LocalScript)</button>
           </div>
         </div>
       </div>
@@ -509,6 +512,6 @@ iframe.model-viewer { width:100%; height:400px; border:none; border-radius:8px; 
   </main>
 </div>
 <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-<script src="app.js?v=11"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>
