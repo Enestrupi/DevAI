@@ -260,22 +260,24 @@ local function startPolling(code)
 	postToWebsite({kind="hello", from="studio", data="Plugin connected. PlaceId="..tostring(game.PlaceId), time=lastTs})
 
 	pollTask = task.spawn(function()
+		local backoff = 2
+		local consecutiveErrors = 0
 		while connected do
 			local url = "https://ntfy.sh/"..topic.."/json?since="..lastTs.."&poll=1"
 			local ok, resp = pcall(function()
 				return HttpService:GetAsync(url, true)
 			end)
 			if ok and resp then
+				consecutiveErrors = 0
+				backoff = 2
 				for line in string.gmatch(resp,"[^\n]+") do
 					if #line > 10 then
 						local okJ, evt = pcall(HttpService.JSONDecode, HttpService, line)
 						if okJ and evt and evt.message then
 							local evtTime = tonumber(evt.time) or 0
 							if evtTime > lastTs then lastTs=evtTime end
-							-- Skip our own outgoing messages (we can tell by tags)
 							local tags = evt.tags or ""
 							if not tags:find("outbox") then
-								-- Parse message: TITLE|TYPE|TARGET|BODY
 								local parts = {}
 								for p in string.gmatch(evt.message,"[^|]+") do table.insert(parts,p) end
 								if #parts >= 4 then
@@ -292,8 +294,17 @@ local function startPolling(code)
 						end
 					end
 				end
+			else
+				consecutiveErrors = consecutiveErrors+1
+				if consecutiveErrors <= 3 then
+					setStatus("⚠ Network error ("..tostring(resp or "unknown")..") retrying in "..backoff.."s…", C.amber)
+				elseif consecutiveErrors % 10 == 0 then
+					setStatus("⚠ Still can't reach sync server. Check HttpService / internet.", C.red)
+				end
+				task.wait(backoff)
+				backoff = math.min(backoff*2, 30)
 			end
-			task.wait(2)
+			task.wait(1)
 		end
 	end)
 end

@@ -1,6 +1,6 @@
 // DevAI Web App — single-file JS, no framework, no build step.
 // All state lives in localStorage. All provider calls go directly from the browser.
-const APP_VERSION = 14; // bump to force localStorage reset
+const APP_VERSION = 15;
 
 // ============================================================================
 // ⚔ DEVAI CONFIG — PASTE YOUR API KEYS HERE FOR "NO SETUP REQUIRED" LAUNCH
@@ -312,35 +312,54 @@ const FALLBACK_CHAIN = [
 ];
 
 async function llmCall(messages, opts={}) {
-  // Build the chain starting with user's current model
-  const chain = [];
+  // Build a resilient provider chain with retry + backoff.
   const curKey = state.llmKey && state.llmKey !== 'pollinations-free' ? state.llmKey : '';
-  const isPoll = state.llmUrl && state.llmUrl.indexOf('pollinations.ai') !== -1;
-  chain.push({ url:state.llmUrl, model:state.llmModel, key: isPoll ? '' : curKey, primary:true });
-  // Appends baked-in OpenRouter as quality fallback if user isn't already on it
-  if (state.llmUrl !== 'https://openrouter.ai/api/v1' && _K.join('').length>5) {
-    chain.push({ url:'https://openrouter.ai/api/v1', model:'nvidia/nemotron-3-ultra-550b-a55b:free', key:_K.join('') });
+  const chain = [];
+
+  // 1. User's currently selected model (primary)
+  chain.push({ url:state.llmUrl, model:state.llmModel, key: state.llmUrl.indexOf('pollinations.ai')!==-1 ? '' : curKey, primary:true });
+
+  // 2. Extra free Pollinations host aliases (different subdomains = separate rate limits)
+  if (state.llmUrl.indexOf('pollinations.ai') !== -1) {
+    chain.push({ url:'https://text.pollinations.ai/openai/v1', model:'openai', key:'', label:'Pollinations (alt host)' });
+    chain.push({ url:'https://ai.pollinations.ai/v1', model:'openai', key:'', label:'Pollinations (alt host 2)' });
   }
-  // Always append Pollinations as final safety net (unless it's already first)
+
+  // 3. Baked OpenRouter key (free models, 50/day) — only if it exists
+  if (_K.join('').length > 5) {
+    chain.push({ url:'https://openrouter.ai/api/v1', model:'nvidia/nemotron-3-ultra-550b-a55b:free', key:_K.join(''), label:'OpenRouter Nemotron' });
+    chain.push({ url:'https://openrouter.ai/api/v1', model:'deepseek/deepseek-v4-flash:free', key:_K.join(''), label:'OpenRouter DeepSeek' });
+    chain.push({ url:'https://openrouter.ai/api/v1', model:'meta-llama/llama-3.3-70b-instruct:free', key:_K.join(''), label:'OpenRouter Llama 3.3' });
+  }
+
+  // 4. Pollinations as final safety net (if user isn't already on it)
   if (state.llmUrl.indexOf('pollinations.ai') === -1) {
-    chain.push({ url:'https://gen.pollinations.ai/v1', model:'openai', key:'' });
+    chain.push({ url:'https://text.pollinations.ai/openai/v1', model:'openai', key:'', label:'Pollinations (fallback)' });
+    chain.push({ url:'https://gen.pollinations.ai/v1', model:'openai', key:'', label:'Pollinations gen' });
   }
+
   let lastErr = '';
   for (let i=0;i<chain.length;i++){
     const p=chain[i];
+    // Skip duplicates (same url+model already tried)
+    const key = p.url+'|'+p.model;
+    if (chain.slice(0,i).some(prev => (prev.url+'|'+prev.model)===key)) continue;
     try{
       const content = await _llmCallRaw(messages, opts, p);
-      if (i > 0 && p.primary !== true) {
-        toast('⚠ Switched to backup model ('+(PRESETS[p.url+'|'+p.model]?.label||'fallback')+')');
-        // Don't permanently switch user's chosen model — just fulfill this one request.
+      if (!p.primary) {
+        toast('⚠ Fell back to '+ (p.label || PRESETS[key]?.label || 'backup model'));
       }
       return content;
     } catch(e){
       lastErr = e.message;
       console.warn('Provider failed:',p.url,p.model,e.message.slice(0,120));
+      // If it's a 429/5xx on the PRIMARY, show a toast but continue chain
+      if (p.primary && /429|5\d\d|rate|too many/i.test(e.message)) {
+        toast('⏳ Rate limited, trying backup…');
+      }
     }
   }
-  throw new Error('All providers failed. Last error: '+lastErr);
+  throw new Error('All providers are rate-limited right now. Wait 30 seconds and try again, or pick a different model in Settings. Last error: '+lastErr);
 }
 
 async function _llmCallRaw(messages, opts, provider) {
@@ -352,19 +371,48 @@ async function _llmCallRaw(messages, opts, provider) {
     stream: false,
   };
   if (opts.max_tokens) body.max_tokens=opts.max_tokens;
-  const headers = { 'Content-Type':'application/json' };
-  if (!isPollAnon) headers['Authorization']='Bearer '+provider.key;
-  headers['HTTP-Referer']=location.href; headers['X-Title']='DevAI';
-  const res = await fetch(provider.url + '/chat/completions', { method:'POST', headers, body:JSON.stringify(body) });
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error('HTTP '+res.status+': '+errText.slice(0,300));
+
+  // Retry loop for 429/5xx with exponential backoff (max 3 retries per provider)
+  const MAX_RETRIES = 3;
+  let delay = 1500;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      console.log(`[DevAI] Retry ${attempt}/${MAX_RETRIES} after ${delay}ms for ${provider.url}`);
+      await new Promise(r=>setTimeout(r, delay));
+      delay *= 2; // 1.5s, 3s, 6s
+    }
+    const headers = { 'Content-Type':'application/json' };
+    if (!isPollAnon) headers['Authorization']='Bearer '+provider.key;
+    headers['HTTP-Referer']=location.href; headers['X-Title']='DevAI';
+    // Add a cache-buster + random seed on retries to bypass 429 caches
+    const url = provider.url + '/chat/completions' + (attempt>0 ? ('?r='+Math.random().toString(36).slice(2)) : '');
+    let res;
+    try {
+      res = await fetch(url, { method:'POST', headers, body:JSON.stringify(body) });
+    } catch(e) {
+      if (attempt === MAX_RETRIES) throw new Error('Network error: '+e.message);
+      continue;
+    }
+    if (res.status === 429 || res.status >= 500) {
+      const errText = await res.text().catch(()=>'');
+      if (attempt < MAX_RETRIES) continue;
+      throw new Error('HTTP '+res.status+(errText?': '+errText.slice(0,200):' (rate limited/server error)'));
+    }
+    if (!res.ok) {
+      const errText = await res.text().catch(()=>'');
+      // 400/401/403/404 = don't retry (auth/bad model error)
+      throw new Error('HTTP '+res.status+(errText?': '+errText.slice(0,300):''));
+    }
+    const data = await res.json();
+    if (data.error) throw new Error(typeof data.error==='string'?data.error:(data.error.message||'provider error'));
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) {
+      if (attempt < MAX_RETRIES) continue;
+      throw new Error('empty response from provider');
+    }
+    return content;
   }
-  const data = await res.json();
-  if (data.error) throw new Error(typeof data.error==='string'?data.error:(data.error.message||'provider error'));
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error('empty response');
-  return content;
+  throw new Error('Max retries exceeded');
 }
 
 // ---------- CHAT MODEL PICKER ----------
@@ -515,43 +563,59 @@ async function startStudioListen() {
   appendStudioLog('🎧 Started listening for Studio messages…');
   try {
     const since = Math.floor(Date.now()/1000)-5;
+    let backoff = 2;
+    let errCount = 0;
     while(studioListenActive) {
-      const res = await fetch('https://ntfy.sh/'+topic+'/json?since='+since+'&poll=1', { signal: studioAbort.signal, cache:'no-store' });
-      if (!res.ok) { await new Promise(r=>setTimeout(r,3000)); continue; }
-      const text = await res.text();
-      for (const line of text.split('\n')) {
-        if (line.length < 5) continue;
-        try {
-          const evt = JSON.parse(line);
-          if (evt.event !== 'message') continue;
-          const tags = evt.tags || '';
-          // Skip our own outbound messages
-          if (tags.includes('inbox')) continue;
-          const body = evt.message || '';
-          // Try to parse as JSON (plugin sends JSON for explorer/script/hello)
-          let data;
-          try { data = JSON.parse(body); } catch { data = null; }
-          if (data && data.kind) {
-            if (data.kind === 'hello') {
-              $('studioStatus').textContent = '🟢 Studio connected! PlaceId='+data.data.match(/PlaceId=(\d+)/)?.[1];
-              $('studioStatus').style.color = 'var(--moss)';
-              appendStudioLog('✅ Plugin connected: '+data.data, 'gold-light');
-            } else if (data.kind === 'explorer') {
-              appendStudioLog('📂 Received Explorer snapshot ('+data.data.length+' chars) — injected into AI context.', 'amber');
-              $('studioContext').value = data.data;
-              toast('📂 Explorer sent to AI — AI can now see your project!');
-            } else if (data.kind === 'script') {
-              appendStudioLog('📄 Received script: '+data.path+' ('+(data.data?.length||0)+' chars)', 'amber');
-              const existing = $('studioContext').value || '';
-              $('studioContext').value = (existing ? existing + '\n\n---\n\n' : '') + data.data;
-              toast('📄 Script sent to AI!');
+      try {
+        const res = await fetch('https://ntfy.sh/'+topic+'/json?since='+since+'&poll=1&r='+Math.random().toString(36).slice(2), { signal: studioAbort.signal, cache:'no-store' });
+        if (res.status === 429 || res.status >= 500) {
+          errCount++;
+          appendStudioLog('⚠ Server busy ('+res.status+') retrying in '+backoff+'s…', 'amber');
+          await new Promise(r=>setTimeout(r, backoff*1000));
+          backoff = Math.min(backoff*2, 30);
+          continue;
+        }
+        if (!res.ok) { await new Promise(r=>setTimeout(r,3000)); continue; }
+        errCount = 0; backoff = 2;
+        const text = await res.text();
+        for (const line of text.split('\n')) {
+          if (line.length < 5) continue;
+          try {
+            const evt = JSON.parse(line);
+            if (evt.event !== 'message') continue;
+            const tags = evt.tags || '';
+            if (tags.includes('inbox')) continue;
+            const body = evt.message || '';
+            let data;
+            try { data = JSON.parse(body); } catch { data = null; }
+            if (data && data.kind) {
+              if (data.kind === 'hello') {
+                $('studioStatus').textContent = '🟢 Studio connected! PlaceId='+(data.data.match(/PlaceId=(\d+)/)?.[1]||'?');
+                $('studioStatus').style.color = 'var(--moss)';
+                appendStudioLog('✅ Plugin connected: '+data.data, 'gold-light');
+              } else if (data.kind === 'explorer') {
+                appendStudioLog('📂 Received Explorer snapshot ('+data.data.length+' chars) — injected into AI context.', 'amber');
+                $('studioContext').value = data.data;
+                toast('📂 Explorer sent to AI — AI can now see your project!');
+              } else if (data.kind === 'script') {
+                appendStudioLog('📄 Received script: '+data.path+' ('+(data.data?.length||0)+' chars)', 'amber');
+                const existing = $('studioContext').value || '';
+                $('studioContext').value = (existing ? existing + '\n\n---\n\n' : '') + data.data;
+                toast('📄 Script sent to AI!');
+              } else {
+                appendStudioLog('📩 '+data.kind+': '+(data.data||'').slice(0,200), 'moss');
+              }
             } else {
-              appendStudioLog('📩 '+data.kind+': '+(data.data||'').slice(0,200), 'moss');
+              appendStudioLog('📩 Unknown: '+body.slice(0,120));
             }
-          } else {
-            appendStudioLog('📩 Unknown: '+body.slice(0,120));
-          }
-        } catch(e) { /* ignore bad json */ }
+          } catch(e) { /* ignore bad json */ }
+        }
+      } catch(e) {
+        if (e.name === 'AbortError') throw e;
+        errCount++;
+        appendStudioLog('⚠ Fetch error: '+e.message+' retrying…', 'amber');
+        await new Promise(r=>setTimeout(r, backoff*1000));
+        backoff = Math.min(backoff*2, 30);
       }
     }
   } catch(e) {
