@@ -1,6 +1,6 @@
 // DevAI Web App — single-file JS, no framework, no build step.
 // All state lives in localStorage. All provider calls go directly from the browser.
-const APP_VERSION = 19;
+const APP_VERSION = 20;
 
 // ============================================================================
 // ⚔ DEVAI CONFIG — PASTE YOUR API KEYS HERE FOR "NO SETUP REQUIRED" LAUNCH
@@ -192,7 +192,7 @@ const state = {
   llmModel: CONFIG.DEFAULT_MODEL,
   llmKey: '',
   meshyKey: '',
-  meshProvider: 'meshy',  // 'meshy' | 'tripo'
+  meshProvider: 'hunyuan',  // 'hunyuan' | 'meshy' | 'tripo'
   memory: { game:'', currency:'', mainUI:'', admin:'', extra:'' },
   sessionCode: '',
   mesh: null, // { previewTaskId, refineTaskId, modelUrlGlb, ..., rigTaskId }
@@ -216,6 +216,8 @@ function load() {
   } catch(e){}
   // Treat saved key of "pollinations-free" as meaning "use default free service"
   if (state.llmKey === 'pollinations-free') state.llmKey = '';
+  // Force Hunyuan 4-view as default 3D (no key required) — override old meshy default
+  if (!state.meshProvider || state.meshProvider === 'meshy' && !state.meshyKey) state.meshProvider = 'hunyuan';
   // If no key is saved in localStorage but CONFIG has a baked-in key, use it.
   if (CONFIG.DEFAULT_LLM_KEY && CONFIG.DEFAULT_LLM_KEY !== 'pollinations-free' && (!state.llmKey || state.llmKey.length === 0) && CONFIG.DEFAULT_LLM_KEY.length > 5) {
     state.llmKey = CONFIG.DEFAULT_LLM_KEY;
@@ -1038,7 +1040,7 @@ $('animSend').addEventListener('click',()=>sendToStudio(null, 'AnimationControll
 function refreshSettingsUI() {
   $('setLlmKey').value=state.llmKey||'';
   $('setMeshyKey').value=state.meshyKey||state.tripoKey||'';
-  if($('meshProvider')) $('meshProvider').value = state.meshProvider||'meshy';
+  if($('meshProvider')) $('meshProvider').value = state.meshProvider||'hunyuan';
   // Show a "saved" badge with last 4 chars
   const badge=$('keySavedBadge');
   if (state.llmKey && state.llmKey.length > 6) {
@@ -1143,7 +1145,7 @@ $('meshProvider')?.addEventListener('change',(e)=>{
 });
 $('saveMeshy').addEventListener('click',()=>{
   state.meshyKey=$('setMeshyKey').value.trim();
-  state.meshProvider=$('meshProvider')?.value||'meshy';
+  state.meshProvider=$('meshProvider')?.value||'hunyuan';
   save(); refreshSettingsUI();
   toast(state.meshProvider.toUpperCase()+' key saved.');
 });
