@@ -1,6 +1,25 @@
 // DevAI Web App — single-file JS, no framework, no build step.
 // All state lives in localStorage. All provider calls go directly from the browser.
 
+// ============================================================================
+// ⚔ DEVAI CONFIG — PASTE YOUR API KEYS HERE FOR "NO SETUP REQUIRED" LAUNCH
+// ============================================================================
+// 🔴 SECURITY WARNING: If you push this file to a PUBLIC GitHub repo, ANYONE
+// can view your key and bots WILL steal it within hours, burning your credits.
+// - FOR PERSONAL / PRIVATE USE: paste keys below → push → your site works instantly.
+// - FOR PUBLIC SITES: leave these BLANK and have users paste their own key,
+//   OR set up a Cloudflare Worker proxy (see README).
+//
+// If these are filled in, the site will use them automatically on first load.
+// If a user later saves their own key via ⚙ Settings, that key OVERRIDES these.
+const CONFIG = {
+  DEFAULT_LLM_KEY:  "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", // paste your sk-or-v1-... (OpenRouter) key here
+  DEFAULT_MESHY_KEY:"",      // paste your msy_... (Meshy) key here (optional)
+  DEFAULT_MODEL:    "qwen/qwen3-coder:free",  // model to use on first visit
+  DEFAULT_LLM_URL:  "https://openrouter.ai/api/v1",
+};
+// ============================================================================
+
 const $ = (id) => document.getElementById(id);
 
 // Provider preset metadata. The dropdown value in HTML must match url|model here.
@@ -104,6 +123,25 @@ function load() {
     const s = JSON.parse(localStorage.getItem('devai_state') || '{}');
     Object.assign(state, s);
   } catch(e){}
+  // If no key is saved in localStorage but CONFIG has one baked in, use the CONFIG default.
+  if ((!state.llmKey || state.llmKey.length === 0) && CONFIG.DEFAULT_LLM_KEY && CONFIG.DEFAULT_LLM_KEY.length > 5) {
+    state.llmKey = CONFIG.DEFAULT_LLM_KEY;
+    state.usedDefaultKey = true; // flag so the UI can show "using built-in key"
+  }
+  if ((!state.meshyKey || state.meshyKey.length === 0) && CONFIG.DEFAULT_MESHY_KEY && CONFIG.DEFAULT_MESHY_KEY.length > 5) {
+    state.meshyKey = CONFIG.DEFAULT_MESHY_KEY;
+    state.usedDefaultMeshy = true;
+  }
+  // Seed default model/URL from CONFIG if nothing is saved yet
+  if (CONFIG.DEFAULT_MODEL && (!state.llmModel || state.llmModel === 'meta-llama/llama-3.1-8b-instruct:free')) {
+    // only override if still at factory default AND user hasn't changed model via Settings
+    const saved = JSON.parse(localStorage.getItem('devai_state') || '{}');
+    if (!saved.llmModel) state.llmModel = CONFIG.DEFAULT_MODEL;
+  }
+  if (CONFIG.DEFAULT_LLM_URL && (!state.llmUrl || state.llmUrl === 'https://openrouter.ai/api/v1')) {
+    const saved = JSON.parse(localStorage.getItem('devai_state') || '{}');
+    if (!saved.llmUrl) state.llmUrl = CONFIG.DEFAULT_LLM_URL;
+  }
 }
 function save() {
   localStorage.setItem('devai_state', JSON.stringify({
@@ -561,10 +599,15 @@ function refreshSettingsUI() {
   if (state.llmKey){
     const preset=PRESETS[state.llmUrl+'|'+state.llmModel];
     const name = preset?preset.label:state.llmModel;
-    cs.textContent='✓ '+name+' — key saved on this device';
-    cs.className='status ok';
+    if (state.usedDefaultKey) {
+      cs.textContent='⚔ Built-in key active — '+name;
+      cs.className='status';
+    } else {
+      cs.textContent='✓ '+name+' — key saved on this device';
+      cs.className='status ok';
+    }
   } else {
-    cs.textContent='Paste an API key in ⚙ Settings to get started.';
+    cs.textContent='Paste an API key in ⚙ Settings (or edit CONFIG in app.js).';
     cs.className='status';
   }
   $('chatModelLabel').textContent=state.llmKey ? (PRESETS[state.llmUrl+'|'+state.llmModel]?.label || state.llmModel) : 'no key';
