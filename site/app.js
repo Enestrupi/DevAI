@@ -1,6 +1,6 @@
 // DevAI Web App — single-file JS, no framework, no build step.
 // All state lives in localStorage. All provider calls go directly from the browser.
-const APP_VERSION = 10; // bump to force localStorage reset
+const APP_VERSION = 11; // bump to force localStorage reset
 
 // ============================================================================
 // ⚔ DEVAI CONFIG — PASTE YOUR API KEYS HERE FOR "NO SETUP REQUIRED" LAUNCH
@@ -23,11 +23,13 @@ const _K = [
   "c2cfa31beb83c31e31",
   "70e17acf37b8011f38241ee9",
 ];
+// Default to Pollinations (no key, effectively unlimited). If user pastes a Groq key they get 14,400/day.
+// OpenRouter (already baked in) is a quality fallback at 50/day.
 const CONFIG = {
   DEFAULT_LLM_KEY:  _K.join(""),   // baked-in OpenRouter key
   DEFAULT_MESHY_KEY:"",            // paste your msy_... (Meshy) key here (optional)
-  DEFAULT_MODEL:    "nvidia/nemotron-3-ultra-550b-a55b:free",  // strongest free model alive
-  DEFAULT_LLM_URL:  "https://openrouter.ai/api/v1",
+  DEFAULT_MODEL:    "openai",
+  DEFAULT_LLM_URL:  "https://gen.pollinations.ai/v1",  // unlimited no-key default
 };
 // ============================================================================
 
@@ -44,11 +46,17 @@ const CHAT_MODELS = [
     models:[
       {v:'https://gen.pollinations.ai/v1|openai',                               label:'Pollinations — GPT-level (auto, no signup)',        tag:'NO KEY'},
     ]},
-  { group:'🆓 Free — Coding (best for Luau, needs free OpenRouter key)',
+  { group:'🆓 Free — Unlimited quota (no OpenRouter daily cap)',
+    models:[
+      {v:'https://api.groq.com/openai/v1|llama-3.1-8b-instant',                   label:'Groq Llama 3.1 8B (⚡ 14,400 req/day — paste Groq key)', tag:'FREE'},
+      {v:'https://api.groq.com/openai/v1|mixtral-8x7b-32768',                      label:'Groq Mixtral 8x7B (⚡ 14,400 req/day)',                tag:'FREE'},
+      {v:'https://api.groq.com/openai/v1|llama-3.3-70b-versatile',                 label:'Groq Llama 3.3 70B (⚡ 1,000 req/day)',                tag:'FREE'},
+      {v:'https://gen.pollinations.ai/v1|openai',                                  label:'Pollinations (no key, anonymous, no cap ⚠ quality varies)', tag:'NO KEY'},
+    ]},
+  { group:'🆓 Free — Coding (best for Luau, OpenRouter key, 50/day)',
     models:[
       {v:'https://openrouter.ai/api/v1|cohere/north-mini-code:free',               label:'Cohere North Mini Code (agentic/terminal code, 256k)', tag:'FREE'},
       {v:'https://openrouter.ai/api/v1|qwen/qwen3.8-27b',                          label:'Qwen 3.8 27B (strong coder)',                        tag:'FREE'},
-      {v:'https://api.groq.com/openai/v1|llama-3.3-70b-versatile',                label:'Groq Llama 3.3 70B (⚡ fastest, needs Groq key)',    tag:'FREE'},
     ]},
   { group:'🆓 Free — Reasoning & big context',
     models:[
@@ -130,7 +138,19 @@ const PRESETS = {
   },
   'https://gen.pollinations.ai/v1|openai': {
     label:'Pollinations AI (no key)', signup:'', signupUrl:'',
-    free:true, nokey:true, note:'⚡ DEFAULT — 100% free, no signup, no API key. Anonymous access to open models (GPT-level).'
+    free:true, nokey:true, note:'⚡ Unlimited, no signup, no API key. Anonymous access to open models. Quality varies and may time out in peak hours; use as a fallback.'
+  },
+  'https://api.groq.com/openai/v1|llama-3.1-8b-instant': {
+    label:'Groq Llama 3.1 8B Instant', signup:'console.groq.com/keys', signupUrl:'https://console.groq.com/keys',
+    free:true, note:'⚡ Extremely fast. 14,400 requests/day free quota (no card). Best daily driver for chat and small scripts.'
+  },
+  'https://api.groq.com/openai/v1|mixtral-8x7b-32768': {
+    label:'Groq Mixtral 8x7B', signup:'console.groq.com/keys', signupUrl:'https://console.groq.com/keys',
+    free:true, note:'⚡ Fast MoE model, 14,400 req/day free, 32k context. Good for longer scripts.'
+  },
+  'https://api.groq.com/openai/v1|llama-3.3-70b-versatile': {
+    label:'Groq Llama 3.3 70B', signup:'console.groq.com/keys', signupUrl:'https://console.groq.com/keys',
+    free:true, note:'⚡ Fastest large model. 1,000 req/day free.'
   },
   'https://openrouter.ai/api/v1|meta-llama/llama-3.1-8b-instruct:free': {
     label:'Llama 3.1 8B', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
@@ -280,47 +300,67 @@ document.querySelectorAll('nav button[data-page]').forEach(btn=>{
   btn.addEventListener('click', ()=>goPage(btn.dataset.page));
 });
 
+// Provider fallback chain: try user's current model; if rate-limited/404/unauthorized, try:
+//   1. Pollinations (anonymous no-key) ← always works
+//   2. Baked-in OpenRouter Nemotron (if key present) ← quality backup
+const FALLBACK_CHAIN = [
+  { url:'https://gen.pollinations.ai/v1', model:'openai', key:'' },
+];
+
 async function llmCall(messages, opts={}) {
-  return _llmCall(messages, opts, false);
-}
-async function _llmCall(messages, opts, retrying) {
-  const isPollinations = state.llmUrl && state.llmUrl.indexOf('pollinations.ai') !== -1;
-  const key = state.llmKey || '';
-  if (!isPollinations && (!key || key === 'pollinations-free')) {
-    throw new Error('No LLM API key configured for this model. Switch to Pollinations (no key) in Settings or the model picker.');
+  // Build the chain starting with user's current model
+  const chain = [];
+  const curKey = state.llmKey && state.llmKey !== 'pollinations-free' ? state.llmKey : '';
+  const isPoll = state.llmUrl && state.llmUrl.indexOf('pollinations.ai') !== -1;
+  chain.push({ url:state.llmUrl, model:state.llmModel, key: isPoll ? '' : curKey, primary:true });
+  // Appends baked-in OpenRouter as quality fallback if user isn't already on it
+  if (state.llmUrl !== 'https://openrouter.ai/api/v1' && _K.join('').length>5) {
+    chain.push({ url:'https://openrouter.ai/api/v1', model:'nvidia/nemotron-3-ultra-550b-a55b:free', key:_K.join('') });
   }
+  // Always append Pollinations as final safety net (unless it's already first)
+  if (state.llmUrl.indexOf('pollinations.ai') === -1) {
+    chain.push({ url:'https://gen.pollinations.ai/v1', model:'openai', key:'' });
+  }
+  let lastErr = '';
+  for (let i=0;i<chain.length;i++){
+    const p=chain[i];
+    try{
+      const content = await _llmCallRaw(messages, opts, p);
+      if (i > 0 && p.primary !== true) {
+        toast('⚠ Switched to backup model ('+(PRESETS[p.url+'|'+p.model]?.label||'fallback')+')');
+        // Don't permanently switch user's chosen model — just fulfill this one request.
+      }
+      return content;
+    } catch(e){
+      lastErr = e.message;
+      console.warn('Provider failed:',p.url,p.model,e.message.slice(0,120));
+    }
+  }
+  throw new Error('All providers failed. Last error: '+lastErr);
+}
+
+async function _llmCallRaw(messages, opts, provider) {
+  const isPollAnon = provider.url.indexOf('pollinations.ai') !== -1 && !provider.key;
   const body = {
-    model: state.llmModel,
-    messages: messages,
+    model: provider.model,
+    messages,
     temperature: opts.temperature ?? 0.3,
     stream: false,
   };
   if (opts.max_tokens) body.max_tokens=opts.max_tokens;
   const headers = { 'Content-Type':'application/json' };
-  // For Pollinations anonymous mode, DON'T send Authorization at all (sending "free" triggers 401)
-  if (!(isPollinations && (!key || key==='pollinations-free'))) {
-    headers['Authorization'] = 'Bearer ' + key;
-  }
-  headers['HTTP-Referer'] = location.href;
-  headers['X-Title']='DevAI';
-  const res = await fetch(state.llmUrl + '/chat/completions', {
-    method:'POST', headers, body: JSON.stringify(body),
-  });
+  if (!isPollAnon) headers['Authorization']='Bearer '+provider.key;
+  headers['HTTP-Referer']=location.href; headers['X-Title']='DevAI';
+  const res = await fetch(provider.url + '/chat/completions', { method:'POST', headers, body:JSON.stringify(body) });
   if (!res.ok) {
     const errText = await res.text();
-    if (res.status === 404 && !retrying && errText && (errText.indexOf('unavailable')!==-1 || errText.indexOf('retired')!==-1 || errText.indexOf('Model not found')!==-1)) {
-      console.warn('Model unavailable, falling back to Pollinations:', errText.slice(0,200));
-      state.llmUrl = CONFIG.DEFAULT_LLM_URL;
-      state.llmModel = CONFIG.DEFAULT_MODEL;
-      state.llmKey = '';
-      save(); refreshSettingsUI(); buildChatModelPicker();
-      toast('⚠ Model unavailable — switched to free Pollinations');
-      return _llmCall(messages, opts, true);
-    }
-    throw new Error('LLM error '+res.status+': '+errText.slice(0,400));
+    throw new Error('HTTP '+res.status+': '+errText.slice(0,300));
   }
   const data = await res.json();
-  return data.choices?.[0]?.message?.content || '(empty response)';
+  if (data.error) throw new Error(typeof data.error==='string'?data.error:(data.error.message||'provider error'));
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error('empty response');
+  return content;
 }
 
 // ---------- CHAT MODEL PICKER ----------
