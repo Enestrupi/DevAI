@@ -525,6 +525,15 @@ $('animDownload').addEventListener('click',()=>downloadText('AnimationScript.lua
 function refreshSettingsUI() {
   $('setLlmKey').value=state.llmKey||'';
   $('setMeshyKey').value=state.meshyKey||'';
+  // Show a "saved" badge with last 4 chars
+  const badge=$('keySavedBadge');
+  if (state.llmKey && state.llmKey.length > 6) {
+    const last4 = state.llmKey.slice(-4);
+    badge.textContent = '— ✓ saved on this device (ends in …'+last4+')';
+    badge.style.color = 'var(--moss)';
+  } else {
+    badge.textContent = '';
+  }
   $('setGame').value=state.memory.game||'';
   $('setCurrency').value=state.memory.currency||'';
   $('setMainUI').value=state.memory.mainUI||'';
@@ -550,13 +559,15 @@ function refreshSettingsUI() {
   // conn status
   const cs=$('connStatus');
   if (state.llmKey){
-    cs.textContent='LLM: '+state.llmModel+' ✓';
+    const preset=PRESETS[state.llmUrl+'|'+state.llmModel];
+    const name = preset?preset.label:state.llmModel;
+    cs.textContent='✓ '+name+' — key saved on this device';
     cs.className='status ok';
   } else {
-    cs.textContent='Add an API key in ⚙ Settings to get started.';
+    cs.textContent='Paste an API key in ⚙ Settings to get started.';
     cs.className='status';
   }
-  $('chatModelLabel').textContent=state.llmKey ? state.llmModel : 'no key';
+  $('chatModelLabel').textContent=state.llmKey ? (PRESETS[state.llmUrl+'|'+state.llmModel]?.label || state.llmModel) : 'no key';
 }
 function updatePresetHint() {
   const v=$('setPreset').value;
@@ -591,12 +602,20 @@ $('saveLlm').addEventListener('click',()=>{
     state.llmModel=$('setLlmModel').value.trim()||state.llmModel;
   }
   save(); refreshSettingsUI();
-  toast('💾 LLM settings saved');
+  if(state.llmKey){
+    toast('✅ LLM key saved — remembered on this device.');
+  } else {
+    toast('LLM key cleared.');
+  }
 });
 $('saveMeshy').addEventListener('click',()=>{
   state.meshyKey=$('setMeshyKey').value.trim();
   save(); refreshSettingsUI();
-  toast('💾 Meshy key saved');
+  if(state.meshyKey){
+    toast('✅ Meshy key saved — remembered on this device.');
+  } else {
+    toast('Meshy key cleared.');
+  }
 });
 $('saveMemory').addEventListener('click',()=>{
   state.memory={

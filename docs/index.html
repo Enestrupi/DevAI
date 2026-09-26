@@ -457,9 +457,10 @@ iframe.model-viewer { width:100%; height:400px; border:none; border-radius:8px; 
             <div style="flex:1;"><label>Model</label><input type="text" id="setLlmModel" placeholder="model-name"/></div>
           </div>
         </div>
-        <label style="margin-top:10px;">API Key</label>
+        <label style="margin-top:10px;">API Key <span id="keySavedBadge" class="tiny" style="color:var(--moss);font-weight:700;"></span></label>
         <input type="password" id="setLlmKey" placeholder="sk-... or sk-or-v1-..."/>
         <p class="tiny" id="llmKeyHint">Get a free key at <a href="https://openrouter.ai/keys" target="_blank" style="color:var(--amber);">openrouter.ai/keys</a> (choose the free Llama 3.1 model).</p>
+        <p class="tiny" style="color:var(--dim);">💾 Keys are saved in <b>this browser only</b> (localStorage). They never touch any DevAI server. Clear them anytime with the 🗑 button at the bottom of Settings.</p>
         <div class="btnrow">
           <button class="btn green" id="testLlm">🔌 Test LLM</button>
           <button class="btn" id="saveLlm">💾 Save</button>
