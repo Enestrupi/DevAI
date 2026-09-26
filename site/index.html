@@ -421,16 +421,35 @@ iframe.model-viewer { width:100%; height:400px; border:none; border-radius:8px; 
         <h3 style="color:var(--gold-light); margin-top:0;">LLM (Chat / Code / GUI)</h3>
         <label>Provider preset</label>
         <select id="setPreset">
-          <option value="https://openrouter.ai/api/v1|openrouter/auto">OpenRouter (Auto-router)</option>
-          <option value="https://openrouter.ai/api/v1|meta-llama/llama-3.1-8b-instruct:free">OpenRouter-Free (Llama 3.1 8B) — default, 100% free</option>
-          <option value="https://openrouter.ai/api/v1|anthropic/claude-3.5-sonnet">OpenRouter — Claude 3.5 Sonnet</option>
-          <option value="https://openrouter.ai/api/v1|openai/gpt-4o-mini">OpenRouter — GPT-4o-mini</option>
-          <option value="https://api.groq.com/openai/v1|llama-3.3-70b-versatile">Groq — Llama 3.3 70B (fast)</option>
-          <option value="https://api.openai.com/v1|gpt-4o-mini">OpenAI direct — GPT-4o-mini</option>
-          <option value="https://api.moonshot.cn/v1|kimi-k2.7-code">Moonshot Kimi — K2.7 Code (paid, strong at Luau, 256k ctx)</option>
-          <option value="https://api.moonshot.cn/v1|kimi-k3">Moonshot Kimi — K3 (paid, 1M-token context, flagship)</option>
-          <option value="http://localhost:11434/v1|llama3.1">Ollama (local)</option>
-          <option value="custom">Custom…</option>
+          <optgroup label="🆓 100% FREE — Coding (best for DevAI scripts)">
+            <option value="https://openrouter.ai/api/v1|qwen/qwen3-coder:free">🆓 Qwen3 Coder (best code, 1M ctx) ← recommended</option>
+            <option value="https://openrouter.ai/api/v1|poolside/laguna-m.1:free">🆓 Poolside Laguna M.1 (agentic coding, 262k)</option>
+            <option value="https://openrouter.ai/api/v1|cohere/north-mini-code:free">🆓 Cohere North Mini Code (terminal/agent coding, 256k)</option>
+            <option value="https://api.groq.com/openai/v1|llama-3.3-70b-versatile">🆓 Groq Llama 3.3 70B (⚡ fastest)</option>
+          </optgroup>
+          <optgroup label="🆓 100% FREE — Reasoning & big context">
+            <option value="https://openrouter.ai/api/v1|nvidia/nemotron-3-ultra-550b-a55b:free">🆓 NVIDIA Nemotron Ultra 550B (550B params, 1M ctx)</option>
+            <option value="https://openrouter.ai/api/v1|deepseek/deepseek-v4-flash:free">🆓 DeepSeek V4 Flash (reasoning, 1M ctx)</option>
+            <option value="https://openrouter.ai/api/v1|meta-llama/llama-3.3-70b-instruct:free">🆓 Llama 3.3 70B (reliable baseline, 131k)</option>
+            <option value="https://openrouter.ai/api/v1|openai/gpt-oss-120b:free">🆓 OpenAI gpt-oss-120b (open-weight, 131k)</option>
+          </optgroup>
+          <optgroup label="🆓 100% FREE — Vision (can read screenshots)">
+            <option value="https://openrouter.ai/api/v1|google/gemma-4-31b-it:free">🆓 Google Gemma 4 31B (vision+text, 262k)</option>
+          </optgroup>
+          <optgroup label="🆓 100% FREE — Utility">
+            <option value="https://openrouter.ai/api/v1|openrouter/free">🆓 OpenRouter Auto (picks any free model)</option>
+            <option value="https://openrouter.ai/api/v1|meta-llama/llama-3.1-8b-instruct:free" selected>🆓 Llama 3.1 8B (lightweight fallback)</option>
+            <option value="http://localhost:11434/v1|llama3.1">🆓 Ollama local (run your own, 100% offline)</option>
+          </optgroup>
+          <optgroup label="💰 Paid / Power user (requires credits)">
+            <option value="https://openrouter.ai/api/v1|openrouter/auto">OpenRouter Auto (paid router)</option>
+            <option value="https://openrouter.ai/api/v1|anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (paid)</option>
+            <option value="https://openrouter.ai/api/v1|openai/gpt-4o-mini">GPT-4o-mini (paid)</option>
+            <option value="https://api.openai.com/v1|gpt-4o-mini">OpenAI direct — GPT-4o-mini (paid)</option>
+            <option value="https://api.moonshot.cn/v1|kimi-k2.7-code">Moonshot Kimi K2.7 Code (paid, $1 min)</option>
+            <option value="https://api.moonshot.cn/v1|kimi-k3">Moonshot Kimi K3 (paid, 1M ctx, $3/$15 MTok)</option>
+          </optgroup>
+          <option value="custom">Custom endpoint…</option>
         </select>
         <div id="customLlm" style="display:none; margin-top:10px;">
           <div class="row">

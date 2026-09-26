@@ -4,48 +4,93 @@
 const $ = (id) => document.getElementById(id);
 
 // Provider preset metadata. The dropdown value in HTML must match url|model here.
+// Default preset on first visit.
+const DEFAULT_PRESET = 'https://openrouter.ai/api/v1|meta-llama/llama-3.1-8b-instruct:free';
+const RECOMMENDED_CODING = 'https://openrouter.ai/api/v1|qwen/qwen3-coder:free';
+
 const PRESETS = {
-  'https://openrouter.ai/api/v1|openrouter/auto': {
-    label:'OpenRouter (Auto-router)', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
-    free:false, note:'Picks the best model per request. Pay-as-you-go, one key for Claude/GPT/Llama/Grok/Gemini.'
+  // ---- FREE CODING (best for DevAI script generation) ----
+  'https://openrouter.ai/api/v1|qwen/qwen3-coder:free': {
+    label:'Qwen3 Coder', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
+    free:true, note:'Strongest free coding model right now. 1M-token context — can ingest huge scripts. Best for Luau, refactors, debugging.'
   },
-  'https://openrouter.ai/api/v1|meta-llama/llama-3.1-8b-instruct:free': {
-    label:'OpenRouter-Free (Llama 3.1 8B)', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
-    free:true, note:'Default — 100% free, no credit card, 20 requests/min. Great for scripts & debugging.'
+  'https://openrouter.ai/api/v1|poolside/laguna-m.1:free': {
+    label:'Poolside Laguna M.1', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
+    free:true, note:'Agentic coding specialist, 262k context. Good for multi-step BUILD→CODE→DEBUG loops.'
   },
-  'https://openrouter.ai/api/v1|anthropic/claude-3.5-sonnet': {
-    label:'OpenRouter — Claude 3.5 Sonnet', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
-    free:false, note:'Strongest all-around for Luau & system design. Pay-as-you-go.'
-  },
-  'https://openrouter.ai/api/v1|openai/gpt-4o-mini': {
-    label:'OpenRouter — GPT-4o-mini', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
-    free:false, note:'Fast & cheap. Good for quick scripts and UI generation.'
+  'https://openrouter.ai/api/v1|cohere/north-mini-code:free': {
+    label:'Cohere North Mini Code', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
+    free:true, note:'Agentic + terminal coding, 256k context. Solid for generating scripts you plan to tweak.'
   },
   'https://api.groq.com/openai/v1|llama-3.3-70b-versatile': {
-    label:'Groq — Llama 3.3 70B (fast)', signup:'console.groq.com/keys', signupUrl:'https://console.groq.com/keys',
-    free:true, note:'Very fast, generous free tier. Good for short responses and chat.'
+    label:'Groq Llama 3.3 70B', signup:'console.groq.com/keys', signupUrl:'https://console.groq.com/keys',
+    free:true, note:'⚡ Blazing fast. Great for quick chat answers and short scripts. Generous free tier.'
   },
-  'https://api.openai.com/v1|gpt-4o-mini': {
-    label:'OpenAI direct — GPT-4o-mini', signup:'platform.openai.com/api-keys', signupUrl:'https://platform.openai.com/api-keys',
-    free:false, note:'OpenAI direct. Pay-as-you-go.'
+  // ---- FREE REASONING & LARGE CONTEXT ----
+  'https://openrouter.ai/api/v1|nvidia/nemotron-3-ultra-550b-a55b:free': {
+    label:'NVIDIA Nemotron Ultra 550B', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
+    free:true, note:'Biggest free model on the list — 550B params, 1M context. Best for architecture planning and debugging large systems.'
   },
-  'https://api.moonshot.cn/v1|kimi-k2.7-code': {
-    label:'Moonshot Kimi — K2.7 Code', signup:'platform.kimi.ai', signupUrl:'https://platform.kimi.ai/console',
-    free:false, paid:true, note:'Specialized coding model, 256k-token context. PAID — requires $1 minimum top-up at platform.kimi.ai.'
+  'https://openrouter.ai/api/v1|deepseek/deepseek-v4-flash:free': {
+    label:'DeepSeek V4 Flash', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
+    free:true, note:'Strong reasoning, 1M context. Excellent for debugging tricky Luau errors and system design.'
   },
-  'https://api.moonshot.cn/v1|kimi-k3': {
-    label:'Moonshot Kimi — K3 (flagship)', signup:'platform.kimi.ai', signupUrl:'https://platform.kimi.ai/console',
-    free:false, paid:true, note:'Flagship reasoning model, 1M-token context (stuff your whole project in). PAID — $3/$15 per MTok, $1 min top-up.'
+  'https://openrouter.ai/api/v1|meta-llama/llama-3.3-70b-instruct:free': {
+    label:'Llama 3.3 70B', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
+    free:true, note:'Solid reliable baseline. 131k context, multilingual. Good all-rounder.'
+  },
+  'https://openrouter.ai/api/v1|openai/gpt-oss-120b:free': {
+    label:'OpenAI gpt-oss-120b', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
+    free:true, note:'Open-weight model from OpenAI, 131k context. Apache 2.0 license.'
+  },
+  // ---- FREE VISION ----
+  'https://openrouter.ai/api/v1|google/gemma-4-31b-it:free': {
+    label:'Google Gemma 4 31B', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
+    free:true, note:'Vision + text, 262k context, 140+ languages. Use if you want to paste a screenshot of an error.'
+  },
+  // ---- FREE UTILITY ----
+  'https://openrouter.ai/api/v1|openrouter/free': {
+    label:'OpenRouter Free (auto)', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
+    free:true, note:'OpenRouter picks whichever free model is available. Handy fallback if a specific model is rate-limited.'
+  },
+  'https://openrouter.ai/api/v1|meta-llama/llama-3.1-8b-instruct:free': {
+    label:'Llama 3.1 8B (default)', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
+    free:true, note:'Lightweight default — works instantly, rarely rate-limited. Upgrade to Qwen3 Coder for harder scripts.'
   },
   'http://localhost:11434/v1|llama3.1': {
     label:'Ollama (local)', signup:'', signupUrl:'',
-    free:true, local:true, note:'100% offline — run Ollama locally first. API key can be anything.'
+    free:true, local:true, note:'100% offline — run Ollama on your machine first. Any key works.'
+  },
+  // ---- PAID ----
+  'https://openrouter.ai/api/v1|openrouter/auto': {
+    label:'OpenRouter Auto (paid)', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
+    free:false, note:'OpenRouter picks the best paid model per request.'
+  },
+  'https://openrouter.ai/api/v1|anthropic/claude-3.5-sonnet': {
+    label:'Claude 3.5 Sonnet (paid)', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
+    free:false, paid:true, note:'Top-tier for Luau & system design. Pay-as-you-go via OpenRouter.'
+  },
+  'https://openrouter.ai/api/v1|openai/gpt-4o-mini': {
+    label:'GPT-4o-mini via OpenRouter (paid)', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
+    free:false, paid:true, note:'Fast & cheap. Pay-as-you-go via OpenRouter.'
+  },
+  'https://api.openai.com/v1|gpt-4o-mini': {
+    label:'OpenAI direct — GPT-4o-mini (paid)', signup:'platform.openai.com/api-keys', signupUrl:'https://platform.openai.com/api-keys',
+    free:false, paid:true, note:'OpenAI direct. Pay-as-you-go.'
+  },
+  'https://api.moonshot.cn/v1|kimi-k2.7-code': {
+    label:'Moonshot Kimi K2.7 Code (paid)', signup:'platform.kimi.ai', signupUrl:'https://platform.kimi.ai/console',
+    free:false, paid:true, note:'Coding model, 256k context. PAID — requires $1 minimum top-up at platform.kimi.ai.'
+  },
+  'https://api.moonshot.cn/v1|kimi-k3': {
+    label:'Moonshot Kimi K3 (paid)', signup:'platform.kimi.ai', signupUrl:'https://platform.kimi.ai/console',
+    free:false, paid:true, note:'Flagship reasoning, 1M-token context. PAID — $3/$15 per MTok, $1 min top-up.'
   },
 };
 
 const state = {
   llmUrl: 'https://openrouter.ai/api/v1',
-  llmModel: 'meta-llama/llama-3.1-8b-instruct:free',
+  llmModel: 'meta-llama/llama-3.1-8b-instruct:free', // upgraded from Qwen recommendation via UI if desired
   llmKey: '',
   meshyKey: '',
   memory: { game:'', currency:'', mainUI:'', admin:'', extra:'' },
