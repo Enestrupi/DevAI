@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>DevAI — AI for Roblox Studio</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><text y='52' font-size='56'>⚔</text></svg>">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css">
@@ -12,202 +12,81 @@
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#0a0a0a;--bg2:#111;--panel:#141414;--panel2:#1a1a1a;--panel3:#222;
-  --border:#222;--border2:#2a2a2a;
-  --citrus:#d4f522;--citrus-dim:#8aab0e;--citrus-glow:rgba(212,245,34,.12);
-  --green:#22c55e;--red:#ef4444;--amber:#f59e0b;--blue:#3b82f6;
-  --text:#f0f0f0;--dim:#999;--muted:#666;--faint:#3a3a3a;
-  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-  --font:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',Roboto,sans-serif;
-}
-html,body{height:100%}
-body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:13px;line-height:1.5;overflow:hidden;-webkit-font-smoothing:antialiased}
-button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;font-size:13px}
-input,textarea,select{font-family:inherit;font-size:13px}
-code,pre{font-family:var(--mono)}
-::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#2a2a2a;border-radius:4px}::-webkit-scrollbar-thumb:hover{background:#3a3a3a}
-
+:root{--bg:#0a0a0a;--bg2:#111;--panel:#141414;--panel2:#1a1a1a;--panel3:#222;--border:#222;--citrus:#d4f522;--citrus-dim:#8aab0e;--citrus-glow:rgba(212,245,34,.12);--green:#22c55e;--red:#ef4444;--amber:#f59e0b;--blue:#3b82f6;--text:#f0f0f0;--dim:#999;--muted:#666;--faint:#3a3a3a;--mono:'JetBrains Mono',ui-monospace,Consolas,monospace;--font:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',Roboto,sans-serif}
+html,body{height:100%}body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:13px;line-height:1.5;overflow:hidden;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;font-size:13px}input,textarea,select{font-family:inherit;font-size:13px}code,pre{font-family:var(--mono)}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#2a2a2a;border-radius:4px}
 .app{display:grid;grid-template-columns:240px 1fr;grid-template-rows:52px 1fr;height:100vh}
 .topbar{grid-column:1/-1;display:flex;align-items:center;padding:0 16px;gap:12px;border-bottom:1px solid var(--border);background:var(--bg2)}
-.logo{font-weight:900;font-size:16px;color:var(--citrus);letter-spacing:.5px;display:flex;align-items:center;gap:8px}
-.logo-mark{width:26px;height:26px;background:var(--citrus);color:#000;border-radius:6px;display:grid;place-items:center;font-size:14px;font-weight:900}
-.project-pill{margin-left:12px;padding:6px 12px;background:var(--panel);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--dim);display:flex;align-items:center;gap:8px}
+.logo{font-weight:900;font-size:16px;color:var(--citrus);letter-spacing:.5px;display:flex;align-items:center;gap:8px}.logo-mark{width:26px;height:26px;background:var(--citrus);color:#000;border-radius:6px;display:grid;place-items:center;font-size:14px;font-weight:900}
+.project-pill{margin-left:12px;padding:6px 12px;background:var(--panel);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--dim)}
 .topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
-.conn-pill{display:flex;align-items:center;gap:6px;padding:5px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:999px;font-size:11px;color:var(--dim)}
-.conn-dot{width:8px;height:8px;border-radius:50%;background:var(--red)}.conn-dot.on{background:var(--green);box-shadow:0 0 8px var(--green)}
-.btn-top{padding:6px 12px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text);font-weight:600}
-.btn-top:hover{background:var(--panel3);border-color:var(--citrus)}
-.btn-top.citrus{background:var(--citrus);color:#000;border-color:var(--citrus)}
-.btn-top.citrus:hover{filter:brightness(.9)}
-
-.sidebar{background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
-.side-section{padding:12px 10px;border-bottom:1px solid var(--border)}
-.side-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding:4px 8px;margin-bottom:6px;font-weight:700}
-.nav-btn{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border-radius:6px;color:var(--dim);font-size:12.5px;font-weight:500;margin-bottom:2px;transition:.15s}
-.nav-btn:hover{background:var(--panel);color:var(--text)}.nav-btn.active{background:var(--citrus-glow);color:var(--citrus);font-weight:600}
-.nav-btn .ic{width:18px;text-align:center;font-size:14px}
-.conv-list{flex:1;overflow-y:auto;padding:8px}
-.conv-item{padding:8px 10px;border-radius:6px;color:var(--dim);font-size:12px;cursor:pointer;margin-bottom:2px;display:flex;align-items:center;gap:8px}
-.conv-item:hover{background:var(--panel);color:var(--text)}.conv-item.active{background:var(--panel2);color:var(--text);border-left:2px solid var(--citrus)}
-.conv-item .pin{color:var(--amber);font-size:10px;margin-left:auto}
-.new-chat{margin:8px 10px;padding:9px;background:var(--citrus);color:#000;border-radius:6px;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px}
-.new-chat:hover{filter:brightness(.9)}
-
-.main{overflow:hidden;display:flex;flex-direction:column;background:var(--bg)}
-.page{display:none;flex-direction:column;flex:1;overflow:hidden}.page.active{display:flex}
-
-.chat-wrap{display:flex;flex-direction:column;flex:1;overflow:hidden;position:relative}
-.chat-header{padding:10px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--bg2)}
-.chat-header h2{font-size:14px;font-weight:700;color:var(--text);flex:1}
-.mode-toggle{display:flex;background:var(--panel);border-radius:6px;padding:3px;border:1px solid var(--border)}
-.mode-btn{padding:5px 12px;font-size:11px;font-weight:600;border-radius:4px;color:var(--dim)}.mode-btn.active{background:var(--citrus);color:#000}
-.chat-messages{flex:1;overflow-y:auto;padding:24px 0}
-.msg{max-width:860px;margin:0 auto 18px;padding:0 24px}.msg.user{display:flex;justify-content:flex-end}
-.msg-bubble{padding:14px 18px;border-radius:12px;font-size:13px;line-height:1.6}
-.msg.user .msg-bubble{background:var(--citrus);color:#000;border-bottom-right-radius:4px;max-width:75%;font-weight:500}
-.msg.ai .msg-bubble{background:var(--panel);border:1px solid var(--border);border-bottom-left-radius:4px;width:100%}
-.ai-badge{display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)}
-.ai-avatar{width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,var(--citrus),var(--green));display:grid;place-items:center;font-size:12px;color:#000;font-weight:900}
-.ai-name{font-weight:700;font-size:12px;color:var(--text)}.ai-best{font-size:11px;color:var(--muted);margin-left:4px}
-.ai-provider{font-size:10px;color:var(--muted);margin-left:auto;padding:2px 8px;background:var(--panel2);border-radius:4px}
-.msg-bubble p{margin-bottom:10px}.msg-bubble p:last-child{margin-bottom:0}
-.msg-bubble ul,.msg-bubble ol{padding-left:22px;margin-bottom:10px}.msg-bubble li{margin-bottom:4px}
-.msg-bubble strong{color:var(--citrus)}.msg.user .msg-bubble strong{color:#000}
-.code-block{margin:12px 0;background:#000;border:1px solid var(--border);border-radius:8px;overflow:hidden}
-.code-head{display:flex;align-items:center;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);gap:8px}
-.code-lang{font-weight:700;color:var(--citrus);font-family:var(--mono)}.code-path{font-family:var(--mono);color:var(--dim)}
-.code-actions{margin-left:auto;display:flex;gap:6px}
-.code-act{padding:4px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:4px;font-size:10px;font-weight:600;color:var(--text)}
-.code-act:hover{border-color:var(--citrus);color:var(--citrus)}.code-act.send{background:var(--green);color:#000;border-color:var(--green)}
-.code-block pre{padding:12px;overflow-x:auto;font-size:12px;line-height:1.5;background:#000}
-.code-block pre code{background:transparent;padding:0;color:#e5e5e5}
+.conn-pill{display:flex;align-items:center;gap:6px;padding:5px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:999px;font-size:11px;color:var(--dim)}.conn-dot{width:8px;height:8px;border-radius:50%;background:var(--red)}.conn-dot.on{background:var(--green);box-shadow:0 0 8px var(--green)}
+.btn-top{padding:6px 12px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text);font-weight:600}.btn-top:hover{background:var(--panel3);border-color:var(--citrus)}.btn-top.citrus{background:var(--citrus);color:#000;border-color:var(--citrus)}.btn-top.citrus:hover{filter:brightness(.9)}
+.sidebar{background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}.side-section{padding:12px 10px;border-bottom:1px solid var(--border)}.side-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding:4px 8px;margin-bottom:6px;font-weight:700}
+.nav-btn{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border-radius:6px;color:var(--dim);font-size:12.5px;font-weight:500;margin-bottom:2px}.nav-btn:hover{background:var(--panel);color:var(--text)}.nav-btn.active{background:var(--citrus-glow);color:var(--citrus);font-weight:600}.nav-btn .ic{width:18px;text-align:center;font-size:14px}
+.conv-list{flex:1;overflow-y:auto;padding:8px}.conv-item{padding:8px 10px;border-radius:6px;color:var(--dim);font-size:12px;cursor:pointer;margin-bottom:2px}.conv-item:hover{background:var(--panel);color:var(--text)}.conv-item.active{background:var(--panel2);color:var(--text);border-left:2px solid var(--citrus)}
+.new-chat{margin:8px 10px;padding:9px;background:var(--citrus);color:#000;border-radius:6px;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px}.new-chat:hover{filter:brightness(.9)}
+.main{overflow:hidden;display:flex;flex-direction:column;background:var(--bg)}.page{display:none;flex-direction:column;flex:1;overflow:hidden}.page.active{display:flex}
+.chat-wrap{display:flex;flex-direction:column;flex:1;overflow:hidden;position:relative}.chat-header{padding:10px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--bg2)}.chat-header h2{font-size:14px;font-weight:700;flex:1}.mode-toggle{display:flex;background:var(--panel);border-radius:6px;padding:3px;border:1px solid var(--border)}.mode-btn{padding:5px 12px;font-size:11px;font-weight:600;border-radius:4px;color:var(--dim)}.mode-btn.active{background:var(--citrus);color:#000}
+.chat-messages{flex:1;overflow-y:auto;padding:24px 0}.msg{max-width:860px;margin:0 auto 18px;padding:0 24px}.msg.user{display:flex;justify-content:flex-end}.msg-bubble{padding:14px 18px;border-radius:12px;font-size:13px;line-height:1.6}.msg.user .msg-bubble{background:var(--citrus);color:#000;border-bottom-right-radius:4px;max-width:75%;font-weight:500}.msg.ai .msg-bubble{background:var(--panel);border:1px solid var(--border);border-bottom-left-radius:4px;width:100%}
+.ai-badge{display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border);flex-wrap:wrap}.ai-avatar{width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,var(--citrus),var(--green));display:grid;place-items:center;font-size:12px;color:#000;font-weight:900}.ai-name{font-weight:700;font-size:12px}.ai-best{font-size:11px;color:var(--muted);margin-left:4px}.ai-why{font-size:11px;color:var(--amber);margin-left:auto;padding:3px 8px;background:rgba(245,158,11,.1);border-radius:4px}.ai-provider{font-size:10px;color:var(--muted);padding:2px 8px;background:var(--panel2);border-radius:4px}
+.msg-bubble p{margin-bottom:10px}.msg-bubble p:last-child{margin-bottom:0}.msg-bubble ul,.msg-bubble ol{padding-left:22px;margin-bottom:10px}.msg-bubble li{margin-bottom:4px}.msg-bubble strong{color:var(--citrus)}.msg.user .msg-bubble strong{color:#000}
+.code-block{margin:12px 0;background:#000;border:1px solid var(--border);border-radius:8px;overflow:hidden}.code-head{display:flex;align-items:center;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);gap:8px;flex-wrap:wrap}.code-lang{font-weight:700;color:var(--citrus);font-family:var(--mono)}.code-path{font-family:var(--mono);color:var(--dim)}.code-actions{margin-left:auto;display:flex;gap:6px}.code-act{padding:4px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:4px;font-size:10px;font-weight:600;color:var(--text);cursor:pointer}.code-act:hover{border-color:var(--citrus);color:var(--citrus)}.code-act.send{background:var(--green);color:#000;border-color:var(--green)}.code-block pre{padding:12px;overflow-x:auto;font-size:12px;line-height:1.5;background:#000}.code-block pre code{background:transparent;padding:0;color:#e5e5e5}
 .inline-code{background:var(--panel2);padding:2px 6px;border-radius:4px;font-family:var(--mono);font-size:12px;color:var(--citrus);border:1px solid var(--border)}
-.msg.user .inline-code{background:rgba(0,0,0,.1);color:#000;border-color:rgba(0,0,0,.15)}
-.plan-card{background:var(--panel2);border:1px solid var(--citrus);border-radius:8px;padding:14px;margin:12px 0}
-.plan-card h4{color:var(--citrus);font-size:12px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px}
-.plan-steps{list-style:none;padding:0;margin:0 0 12px}.plan-steps li{padding:6px 0 6px 24px;position:relative;font-size:12px;color:var(--dim);border-bottom:1px solid var(--border)}
-.plan-steps li:last-child{border-bottom:none}.plan-steps li::before{content:attr(data-n);position:absolute;left:0;color:var(--citrus);font-weight:700;font-family:var(--mono);font-size:11px}
-.plan-meta{font-size:11px;color:var(--muted);margin-bottom:12px;display:flex;gap:14px;flex-wrap:wrap}
-.plan-actions{display:flex;gap:8px}.plan-actions button{padding:7px 14px;border-radius:6px;font-size:11px;font-weight:700}
-.plan-build{background:var(--citrus);color:#000}.plan-cancel{background:var(--panel2);color:var(--text);border:1px solid var(--border)}
+.plan-card{background:var(--panel2);border:1px solid var(--citrus);border-radius:8px;padding:14px;margin:12px 0}.plan-card h4{color:var(--citrus);font-size:12px;font-weight:700;margin-bottom:10px}.plan-steps{list-style:none;padding:0;margin:0 0 12px}.plan-steps li{padding:6px 0 6px 24px;position:relative;font-size:12px;color:var(--dim);border-bottom:1px solid var(--border)}.plan-steps li::before{content:attr(data-n);position:absolute;left:0;color:var(--citrus);font-weight:700;font-family:var(--mono);font-size:11px}.plan-meta{font-size:11px;color:var(--muted);margin-bottom:12px;display:flex;gap:14px;flex-wrap:wrap}.plan-actions{display:flex;gap:8px}.plan-actions button{padding:7px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer}.plan-build{background:var(--citrus);color:#000}.plan-cancel{background:var(--panel2);color:var(--text);border:1px solid var(--border)}
 
-.input-wrap{padding:16px 24px 20px;border-top:1px solid var(--border);background:var(--bg2)}
-.input-area{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:.2s}
-.input-area:focus-within{border-color:var(--citrus);box-shadow:0 0 0 3px var(--citrus-glow)}
-.input-row{padding:12px 14px;display:flex;align-items:flex-end;gap:10px}
-.input-row textarea{flex:1;background:transparent;border:none;color:var(--text);resize:none;min-height:24px;max-height:200px;outline:none;font-size:13px;line-height:1.5;font-family:var(--font)}
-.send-btn{width:36px;height:36px;border-radius:8px;background:var(--citrus);color:#000;display:grid;place-items:center;font-weight:900;font-size:16px;flex-shrink:0}
-.send-btn:hover{filter:brightness(.9)}.send-btn:disabled{background:var(--faint);color:var(--muted);cursor:not-allowed}
-.input-tools{display:flex;gap:4px;padding:8px 10px;border-top:1px solid var(--border);align-items:center;flex-wrap:wrap}
-.tool-btn{padding:5px 10px;border-radius:6px;color:var(--dim);font-size:11px;display:flex;align-items:center;gap:5px}
-.tool-btn:hover{background:var(--panel2);color:var(--text)}.tool-btn.on{color:var(--citrus);background:var(--citrus-glow)}
-.context-toggle{margin-left:auto;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer}
-.model-pill{padding:5px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;font-size:11px;display:flex;align-items:center;gap:6px;color:var(--dim)}
-.model-pill:hover{border-color:var(--citrus)}.model-pill .dot{width:6px;height:6px;border-radius:50%;background:var(--citrus)}
+/* Diff modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;display:none;align-items:center;justify-content:center;padding:20px}.modal-bg.open{display:flex}.modal{background:var(--panel);border:1px solid var(--border);border-radius:12px;max-width:780px;width:100%;max-height:80vh;overflow:hidden;display:flex;flex-direction:column}.modal-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center}.modal-head h3{font-size:14px;font-weight:700;flex:1;color:var(--amber)}.modal-close{width:28px;height:28px;border-radius:6px;display:grid;place-items:center;color:var(--muted);cursor:pointer}.modal-body{padding:18px;overflow-y:auto}.diff-box{background:#000;border:1px solid var(--border);border-radius:8px;padding:14px;font-family:var(--mono);font-size:11px;max-height:300px;overflow:auto;white-space:pre-wrap}.diff-add{color:var(--green);display:block}.diff-del{color:var(--red);display:block;text-decoration:line-through;text-decoration-color:rgba(239,68,68,.4)}.diff-ctx{color:var(--muted);display:block}
+.modal-actions{padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}.btn-primary{padding:8px 16px;background:var(--citrus);color:#000;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer}.btn-danger{padding:8px 16px;background:var(--red);color:#fff;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer}.btn-secondary{padding:8px 16px;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;font-weight:700;font-size:12px;cursor:pointer}
+
+.action-card{background:var(--panel2);border:1px solid var(--amber);border-radius:8px;padding:12px;margin:12px 0}.action-card h4{color:var(--amber);font-size:11px;font-weight:700;margin-bottom:8px;display:flex;gap:8px;align-items:center}.action-status{font-size:10px;padding:2px 8px;border-radius:4px;font-weight:700}.action-status.pending{background:rgba(245,158,11,.15);color:var(--amber)}.action-status.sent{background:rgba(59,130,246,.15);color:var(--blue)}.action-status.done{background:rgba(34,197,94,.15);color:var(--green)}.action-status.failed,.action-status.cancelled{background:rgba(239,68,68,.15);color:var(--red)}
+.action-path{font-family:var(--mono);font-size:12px;color:var(--text);margin-bottom:8px}
+
+.input-wrap{padding:16px 24px 20px;border-top:1px solid var(--border);background:var(--bg2)}.input-area{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden}.input-area:focus-within{border-color:var(--citrus);box-shadow:0 0 0 3px var(--citrus-glow)}
+.input-row{padding:12px 14px;display:flex;align-items:flex-end;gap:10px}.input-row textarea{flex:1;background:transparent;border:none;color:var(--text);resize:none;min-height:24px;max-height:200px;outline:none;font-size:13px;line-height:1.5;font-family:var(--font)}
+.send-btn{width:36px;height:36px;border-radius:8px;background:var(--citrus);color:#000;display:grid;place-items:center;font-weight:900;font-size:16px;flex-shrink:0;cursor:pointer}.send-btn:disabled{background:var(--faint);color:var(--muted);cursor:not-allowed}
+.input-tools{display:flex;gap:4px;padding:8px 10px;border-top:1px solid var(--border);align-items:center;flex-wrap:wrap}.tool-btn{padding:5px 10px;border-radius:6px;color:var(--dim);font-size:11px;display:flex;align-items:center;gap:5px;cursor:pointer}.tool-btn:hover{background:var(--panel2);color:var(--text)}
+.context-toggle{margin-left:auto;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer}.model-pill{padding:5px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;font-size:11px;display:flex;align-items:center;gap:6px;color:var(--dim);cursor:pointer}.model-pill .dot{width:6px;height:6px;border-radius:50%;background:var(--citrus)}
 .input-hint{font-size:10px;color:var(--muted);text-align:center;margin-top:8px}
 
-.drawer{position:absolute;bottom:80px;left:24px;right:24px;max-width:860px;margin:0 auto;background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.6);z-index:100;display:none;max-height:60vh;overflow-y:auto}
-.drawer.open{display:block}
-.drawer-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center}.drawer-head h3{font-size:13px;font-weight:700;flex:1}
-.drawer-close{width:28px;height:28px;border-radius:6px;display:grid;place-items:center;color:var(--muted)}.drawer-close:hover{background:var(--panel2);color:var(--text)}
-.model-grid{padding:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
-.model-card{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:12px;cursor:pointer;transition:.15s}
-.model-card:hover{border-color:var(--citrus)}.model-card.sel{border-color:var(--citrus);background:var(--citrus-glow)}
-.model-card h4{font-size:13px;font-weight:700;margin-bottom:2px;display:flex;align-items:center;gap:6px}
-.model-card .provider{font-size:10px;color:var(--muted);margin-bottom:8px}
-.model-card .best{font-size:11px;color:var(--dim);margin-bottom:8px}
-.stars{font-size:10px;color:var(--amber);letter-spacing:1px}.stars .off{color:var(--faint)}
+.drawer{position:absolute;bottom:80px;left:24px;right:24px;max-width:860px;margin:0 auto;background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.6);z-index:100;display:none;max-height:60vh;overflow-y:auto}.drawer.open{display:block}.drawer-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center}.drawer-head h3{font-size:13px;font-weight:700;flex:1}
+.drawer-close{width:28px;height:28px;border-radius:6px;display:grid;place-items:center;color:var(--muted);cursor:pointer}
+.model-grid{padding:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}.model-card{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:12px;cursor:pointer}.model-card:hover{border-color:var(--citrus)}.model-card.sel{border-color:var(--citrus);background:var(--citrus-glow)}.model-card h4{font-size:13px;font-weight:700;margin-bottom:2px}.model-card .provider{font-size:10px;color:var(--muted);margin-bottom:8px}.model-card .best{font-size:11px;color:var(--dim);margin-bottom:8px}.stars{font-size:10px;color:var(--amber);letter-spacing:1px}.stars .off{color:var(--faint)}.config{font-size:9px;padding:2px 6px;border-radius:3px;margin-left:4px}.config.on{background:rgba(34,197,94,.2);color:var(--green)}.config.off{background:rgba(239,68,68,.15);color:var(--red)}
+.context-panel{position:absolute;bottom:80px;right:24px;width:280px;background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.6);z-index:100;display:none;padding:14px}.context-panel.open{display:block}.context-panel h4{font-size:12px;font-weight:700;margin-bottom:10px;color:var(--citrus)}.ctx-item{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:11px;color:var(--dim)}.ctx-item input{accent-color:var(--citrus)}.ctx-count{font-size:10px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
 
-.context-panel{position:absolute;bottom:80px;right:24px;width:280px;background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.6);z-index:100;display:none;padding:14px}
-.context-panel.open{display:block}
-.context-panel h4{font-size:12px;font-weight:700;margin-bottom:10px;color:var(--citrus);display:flex;align-items:center;gap:6px}
-.ctx-item{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:11px;color:var(--dim)}.ctx-item input{accent-color:var(--citrus)}
-.ctx-count{font-size:10px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
-
-.page-pad{padding:24px 32px;overflow-y:auto;flex:1}
-.page-pad h2{font-size:20px;font-weight:800;margin-bottom:4px}.page-pad .sub{color:var(--dim);margin-bottom:24px;font-size:13px}
-.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:24px}
-.step-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px}
-.step-num{width:28px;height:28px;border-radius:8px;background:var(--citrus);color:#000;font-weight:900;display:grid;place-items:center;margin-bottom:10px;font-size:12px}
-.step-card h4{font-size:12px;font-weight:700;margin-bottom:6px}.step-card p{font-size:11px;color:var(--dim);line-height:1.5}
-.pairing-box{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:28px;text-align:center;margin-bottom:20px}
-.pairing-code{font-family:var(--mono);font-size:48px;font-weight:900;letter-spacing:8px;color:var(--citrus);background:#000;padding:20px;border-radius:10px;border:1px dashed var(--border);margin:16px 0;user-select:all}
-.pairing-hint{font-size:12px;color:var(--muted)}
-.big-status{display:inline-flex;align-items:center;gap:10px;padding:10px 18px;border-radius:999px;font-size:13px;font-weight:700;margin:16px 0}
-.big-status.off{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.3)}
-.big-status.on{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.3)}
-.big-status .pulse{width:10px;height:10px;border-radius:50%;background:currentColor;animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-
-.scan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:16px 0}
-.scan-stat{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center}
-.scan-stat .n{font-size:28px;font-weight:900;color:var(--citrus);font-family:var(--mono)}
-.scan-stat .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:4px}
-.problem-list{margin-top:16px;display:flex;flex-direction:column;gap:8px}
-.problem{background:var(--panel);border-left:3px solid var(--amber);padding:10px 14px;border-radius:0 8px 8px 0;font-size:12px;display:flex;align-items:center;gap:10px}
-.problem.ok{border-left-color:var(--green)}.problem.err{border-left-color:var(--red)}
-.problem .msg2{flex:1;color:var(--dim)}.problem .act{padding:4px 10px;background:var(--panel2);border-radius:4px;font-size:10px;font-weight:700;color:var(--citrus)}
-
-.output-box{background:#000;border:1px solid var(--border);border-radius:8px;padding:12px;font-family:var(--mono);font-size:11px;max-height:300px;overflow-y:auto}
-.out-line{padding:3px 0;color:#999}.out-line.ok{color:var(--green)}.out-line.warn{color:var(--amber)}.out-line.err{color:var(--red)}
-
-.int-list{display:flex;flex-direction:column;gap:8px}
-.int-item{display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--panel);border:1px solid var(--border);border-radius:10px}
-.int-icon{width:36px;height:36px;border-radius:8px;background:var(--panel2);display:grid;place-items:center;font-size:18px}
-.int-info{flex:1}.int-info h4{font-size:13px;font-weight:700}.int-info p{font-size:11px;color:var(--muted)}
-.int-status{font-size:10px;padding:3px 8px;border-radius:4px;font-weight:700}
-.int-status.on{background:rgba(34,197,94,.15);color:var(--green)}.int-status.off{background:rgba(239,68,68,.1);color:var(--red)}
-.int-btn{padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;background:var(--panel2);border:1px solid var(--border);color:var(--text)}
-.int-btn:hover{border-color:var(--citrus);color:var(--citrus)}.int-btn.citrus{background:var(--citrus);color:#000;border-color:var(--citrus)}
-
-.proj-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
-.proj-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:.15s}
-.proj-card:hover{border-color:var(--citrus);transform:translateY(-2px)}
-.proj-card h3{font-size:14px;font-weight:700;margin-bottom:4px}
-.proj-card .meta{font-size:11px;color:var(--muted);margin-bottom:10px;display:flex;gap:10px}
-.proj-card .conn{font-size:10px;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:4px}
-.proj-card .conn.on{background:rgba(34,197,94,.1);color:var(--green)}.proj-card .conn.off{background:rgba(239,68,68,.1);color:var(--red)}
-
-.settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
-.set-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:18px}
-.set-card h3{font-size:13px;font-weight:700;color:var(--citrus);margin-bottom:12px;display:flex;align-items:center;gap:8px}
-.set-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px}
-.set-row:last-child{border-bottom:none}.set-row label{color:var(--dim)}
-.set-row input[type=text],.set-row input[type=password],.set-row select,.set-row input[type=number]{background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;min-width:180px}
-.set-row input:focus{outline:none;border-color:var(--citrus)}
-
-.sec-head{display:flex;align-items:center;gap:12px;margin-bottom:14px;margin-top:24px}.sec-head:first-child{margin-top:0}
-.sec-head h3{font-size:14px;font-weight:700;flex:1}.sec-head .add{padding:6px 12px;background:var(--citrus);color:#000;border-radius:6px;font-size:11px;font-weight:700}
-
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--panel);border:1px solid var(--border);padding:10px 18px;border-radius:8px;font-size:12px;color:var(--text);z-index:1000;transition:.3s;box-shadow:0 8px 30px rgba(0,0,0,.5)}
-.toast.show{transform:translateX(-50%) translateY(0)}.toast.ok{border-color:var(--green)}.toast.err{border-color:var(--red)}
-
-@media(max-width:768px){.app{grid-template-columns:1fr}.sidebar{position:fixed;left:-280px;top:52px;bottom:0;width:260px;z-index:200;transition:.25s}.sidebar.open{left:0;box-shadow:0 0 40px rgba(0,0,0,.8)}.page-pad{padding:16px}.pairing-code{font-size:30px;letter-spacing:4px;padding:14px}.msg{padding:0 16px}.input-wrap{padding:12px 16px}.model-grid{grid-template-columns:1fr}}
+.page-pad{padding:24px 32px;overflow-y:auto;flex:1}.page-pad h2{font-size:20px;font-weight:800;margin-bottom:4px}.page-pad .sub{color:var(--dim);margin-bottom:24px;font-size:13px}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:24px}.step-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px}.step-num{width:28px;height:28px;border-radius:8px;background:var(--citrus);color:#000;font-weight:900;display:grid;place-items:center;margin-bottom:10px;font-size:12px}.step-card h4{font-size:12px;font-weight:700;margin-bottom:6px}.step-card p{font-size:11px;color:var(--dim);line-height:1.5}
+.pairing-box{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:28px;text-align:center;margin-bottom:20px}.pairing-code{font-family:var(--mono);font-size:48px;font-weight:900;letter-spacing:8px;color:var(--citrus);background:#000;padding:20px;border-radius:10px;border:1px dashed var(--border);margin:16px 0;user-select:all}
+.big-status{display:inline-flex;align-items:center;gap:10px;padding:10px 18px;border-radius:999px;font-size:13px;font-weight:700;margin:16px 0}.big-status.off{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.3)}.big-status.on{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.3)}.pulse{width:10px;height:10px;border-radius:50%;background:currentColor;animation:pulse 2s infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.scan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:16px 0}.scan-stat{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center}.scan-stat .n{font-size:28px;font-weight:900;color:var(--citrus);font-family:var(--mono)}.scan-stat .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+.output-box{background:#000;border:1px solid var(--border);border-radius:8px;padding:12px;font-family:var(--mono);font-size:11px;max-height:400px;overflow:auto}.out-line{padding:3px 0;color:#999}.out-line.ok{color:var(--green)}.out-line.warn{color:var(--amber)}.out-line.err{color:var(--red)}
+.int-list{display:flex;flex-direction:column;gap:8px}.int-item{display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--panel);border:1px solid var(--border);border-radius:10px}.int-icon{width:36px;height:36px;border-radius:8px;background:var(--panel2);display:grid;place-items:center;font-size:18px}.int-info{flex:1}.int-info h4{font-size:13px;font-weight:700}.int-info p{font-size:11px;color:var(--muted)}.int-status{font-size:10px;padding:3px 8px;border-radius:4px;font-weight:700}.int-status.on{background:rgba(34,197,94,.15);color:var(--green)}.int-status.off{background:rgba(239,68,68,.1);color:var(--red)}.int-input{background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;width:280px}.int-input:focus{outline:none;border-color:var(--citrus)}
+.sec-head{display:flex;align-items:center;gap:12px;margin-bottom:14px;margin-top:24px}.sec-head:first-child{margin-top:0}.sec-head h3{font-size:14px;font-weight:700;flex:1}.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--panel);border:1px solid var(--border);padding:10px 18px;border-radius:8px;font-size:12px;color:var(--text);z-index:1000;transition:.3s}.toast.show{transform:translateX(-50%) translateY(0)}.toast.ok{border-color:var(--green)}.toast.err{border-color:var(--red)}
+.backend-err{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(239,68,68,.15);border:1px solid var(--red);color:var(--red);padding:10px 18px;border-radius:8px;font-size:12px;z-index:200;display:none}.backend-err.show{display:block}
+@media(max-width:768px){.app{grid-template-columns:1fr}.sidebar{position:fixed;left:-280px;top:52px;bottom:0;width:260px;z-index:200;transition:.25s}.sidebar.open{left:0}.page-pad{padding:16px}.pairing-code{font-size:28px;letter-spacing:4px;padding:14px}.msg{padding:0 16px}.input-wrap{padding:12px 16px}.model-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
+<div class="backend-err" id="backendErr">⚠ Cannot reach backend at 127.0.0.1:42069. Start it with start-devai.bat.</div>
 <div class="app">
   <div class="topbar">
     <div class="logo"><span class="logo-mark">⚔</span>DevAI</div>
-    <div class="project-pill" id="projPill">📁 <span id="projName">My Game</span></div>
+    <div class="project-pill">📁 <span id="projName">My Game</span></div>
     <div class="topbar-right">
-      <div class="conn-pill"><span class="conn-dot" id="connDot"></span><span id="connLabel">Disconnected</span></div>
+      <div class="conn-pill"><span class="conn-dot" id="connDot"></span><span id="connLabel">Backend</span></div>
+      <div class="conn-pill"><span class="conn-dot" id="studioDot"></span><span id="studioLabel">Studio</span></div>
       <button class="btn-top" onclick="showPage('studio')">🔌 Connect</button>
       <button class="btn-top citrus" onclick="newChat()">＋ New Chat</button>
     </div>
   </div>
-
   <div class="sidebar" id="sidebar">
     <div class="side-section">
       <div class="side-label">Workspace</div>
       <button class="nav-btn active" data-page="chat" onclick="showPage('chat')"><span class="ic">💬</span>AI Chat</button>
-      <button class="nav-btn" data-page="projects" onclick="showPage('projects')"><span class="ic">📁</span>Projects</button>
-      <button class="nav-btn" data-page="models" onclick="showPage('models')"><span class="ic">🧠</span>AI Models</button>
       <button class="nav-btn" data-page="studio" onclick="showPage('studio')"><span class="ic">🔌</span>Studio Sync</button>
-      <button class="nav-btn" data-page="scan" onclick="showPage('scan')"><span class="ic">🔍</span>Project Scan</button>
+      <button class="nav-btn" data-page="scan" onclick="reqScan()"><span class="ic">🔍</span>Project Scan</button>
       <button class="nav-btn" data-page="output" onclick="showPage('output')"><span class="ic">📟</span>Live Output</button>
-      <button class="nav-btn" data-page="integrations" onclick="showPage('integrations')"><span class="ic">🔗</span>Integrations</button>
       <button class="nav-btn" data-page="history" onclick="showPage('history')"><span class="ic">🕐</span>History</button>
       <button class="nav-btn" data-page="settings" onclick="showPage('settings')"><span class="ic">⚙️</span>Settings</button>
     </div>
@@ -215,7 +94,6 @@ code,pre{font-family:var(--mono)}
     <div class="conv-list" id="convList"></div>
     <button class="new-chat" onclick="newChat()">＋ New Conversation</button>
   </div>
-
   <div class="main">
     <section class="page active" id="page-chat">
       <div class="chat-wrap">
@@ -225,7 +103,6 @@ code,pre{font-family:var(--mono)}
             <button class="mode-btn active" data-mode="build" onclick="setMode('build')">🔨 Build</button>
             <button class="mode-btn" data-mode="design" onclick="setMode('design')">🎨 Design</button>
           </div>
-          <button class="btn-top" onclick="regenLast()" title="Regenerate">↻</button>
         </div>
         <div class="chat-messages" id="chatMsgs"></div>
         <div class="drawer" id="modelDrawer">
@@ -234,148 +111,100 @@ code,pre{font-family:var(--mono)}
         </div>
         <div class="context-panel" id="ctxPanel">
           <h4>📋 Project Context</h4>
-          <label class="ctx-item"><input type="checkbox" id="ctx1" checked>Current Script</label>
-          <label class="ctx-item"><input type="checkbox" id="ctx2" checked>Selected Instance</label>
-          <label class="ctx-item"><input type="checkbox" id="ctx3" checked>Project Structure</label>
-          <label class="ctx-item"><input type="checkbox" id="ctx4">Workspace</label>
-          <label class="ctx-item"><input type="checkbox" id="ctx5">Output Errors</label>
-          <label class="ctx-item"><input type="checkbox" id="ctx6">UI Hierarchy</label>
-          <label class="ctx-item"><input type="checkbox" id="ctx7">All Scripts</label>
-          <label class="ctx-item"><input type="checkbox" id="ctx8">Terrain</label>
-          <label class="ctx-item"><input type="checkbox" id="ctx9">NPCs</label>
-          <div class="ctx-count"><span id="ctxCount">3</span> selected — sent with next message</div>
+          <label class="ctx-item"><input type="checkbox" id="ctx1" checked>Selected Object</label>
+          <label class="ctx-item"><input type="checkbox" id="ctx2" checked>Current Script</label>
+          <label class="ctx-item"><input type="checkbox" id="ctx3" checked>Project Tree</label>
+          <label class="ctx-item"><input type="checkbox" id="ctx4" checked>Output / Errors</label>
+          <label class="ctx-item"><input type="checkbox" id="ctx5">All Scripts</label>
+          <div class="ctx-count">Context is fetched from Studio and sent automatically.</div>
         </div>
         <div class="input-wrap">
           <div class="input-area">
             <div class="input-row">
-              <textarea id="userInput" rows="1" placeholder="Ask DevAI anything… (/create, /scan, /fix, /explain)" onkeydown="onKey(event)" oninput="autoGrow(this)"></textarea>
-              <button class="send-btn" id="sendBtn" onclick="sendMsg()" title="Send (Enter)">➤</button>
+              <textarea id="userInput" rows="1" placeholder="Ask DevAI… (/create inventory, /fix errors, explain this script)" onkeydown="onKey(event)" oninput="autoGrow(this)"></textarea>
+              <button class="send-btn" id="sendBtn" onclick="sendMsg()">➤</button>
             </div>
             <div class="input-tools">
-              <button class="tool-btn" title="Attach">📷</button>
-              <button class="tool-btn" onclick="showCmds()">⚡ Commands</button>
               <button class="tool-btn" onclick="stopGen()" id="stopBtn" style="display:none">⏹ Stop</button>
               <button class="model-pill" onclick="toggleDrawer()"><span class="dot"></span><span id="modelPill">Auto</span> ▾</button>
               <button class="context-toggle" onclick="toggleCtx()">📋 Context ▾</button>
             </div>
           </div>
-          <div class="input-hint">DevAI can make mistakes. Always review code before sending to Studio. <b>Enter</b> to send, <b>Shift+Enter</b> for newline.</div>
+          <div class="input-hint">API keys stay on the local backend — never exposed to browser or plugin. Enter to send, Shift+Enter for newline.</div>
         </div>
       </div>
     </section>
 
-    <section class="page" id="page-projects"><div class="page-pad">
-      <h2>📁 My Projects</h2><p class="sub">Each project stores its own conversations, scripts, and Studio connection.</p>
-      <div class="sec-head"><h3>Active Projects</h3><button class="add" onclick="newProject()">＋ New Project</button></div>
-      <div class="proj-grid" id="projGrid"></div>
-    </div></section>
-
-    <section class="page" id="page-models"><div class="page-pad">
-      <h2>🧠 AI Models</h2><p class="sub">Select which AI powers DevAI. Add your own API keys in Settings for live AI, or use the built-in templates.</p>
-      <div class="model-grid" id="modelsPageGrid" style="margin-top:16px"></div>
-    </div></section>
-
     <section class="page" id="page-studio"><div class="page-pad">
-      <h2>🔌 Connect Roblox Studio</h2><p class="sub">Pair Studio with DevAI to send scripts directly into your game — no servers, no Python.</p>
+      <h2>🔌 Connect Roblox Studio</h2><p class="sub">Pair Studio using a temporary code. Keys and actions route through the local backend.</p>
       <div class="steps">
-        <div class="step-card"><div class="step-num">1</div><h4>Install Plugin</h4><p>Download DevAI-v6.zip, extract, run install-devai.bat — or drop DevAI.plugin.lua into your Plugins folder.</p></div>
-        <div class="step-card"><div class="step-num">2</div><h4>Open Studio</h4><p>Launch Roblox Studio and open any place.</p></div>
-        <div class="step-card"><div class="step-num">3</div><h4>Open Plugin</h4><p>Plugins tab → click DevAI. The Lemonade Studio Bridge panel opens.</p></div>
-        <div class="step-card"><div class="step-num">4</div><h4>Pair</h4><p>Click "Generate New Code" below, then press the ↻ Refresh button in the plugin. It picks up the code automatically.</p></div>
-        <div class="step-card"><div class="step-num">5</div><h4>You're live</h4><p>Green dot appears top-right. Every "Send to Studio" inserts instantly.</p></div>
+        <div class="step-card"><div class="step-num">1</div><h4>Start server</h4><p>Double-click <b>start-devai.bat</b> — it installs the plugin and opens this page.</p></div>
+        <div class="step-card"><div class="step-num">2</div><h4>Open Studio</h4><p>Launch Roblox Studio and open your place.</p></div>
+        <div class="step-card"><div class="step-num">3</div><h4>Open plugin</h4><p>Plugins tab → DevAI. Paste the code and click Connect.</p></div>
+        <div class="step-card"><div class="step-num">4</div><h4>Live</h4><p>Green dot top-right. Send to Studio inserts instantly; Studio confirms success/failure.</p></div>
       </div>
       <div class="pairing-box">
         <h3 style="font-size:14px;margin-bottom:4px">PAIRING CODE</h3>
         <div class="pairing-code" id="pairCode">----</div>
-        <button class="btn-top citrus" onclick="genPairCode()" style="margin-right:8px">🔄 Generate New Code</button>
-        <button class="btn-top" onclick="copyPair()">📋 Copy to Clipboard</button>
-        <div class="pairing-hint" style="margin-top:12px">The plugin polls your clipboard every second. Once it sees the pairing tag it connects automatically.</div>
+        <button class="btn-top citrus" onclick="genPairCode()">🔄 Generate Code</button>
+        <div style="margin-top:12px;font-size:11px;color:var(--muted)">Code expires after 5 minutes.</div>
       </div>
-      <div id="studioConnBox" style="text-align:center"><div class="big-status off" id="studioStatusBig"><span class="pulse"></span><span>Waiting for Studio…</span></div></div>
-      <div class="sec-head"><h3>Downloads</h3></div>
-      <div class="int-list">
-        <div class="int-item"><div class="int-icon">📥</div><div class="int-info"><h4>Plugin (v6 — Lemonade Studio Bridge)</h4><p>Clipboard bridge, auto-insert, project scan, output streaming.</p></div><button class="int-btn citrus" onclick="downloadPlugin()">⬇ DevAI-v6.zip</button></div>
-        <div class="int-item"><div class="int-icon">📋</div><div class="int-info"><h4>install-devai.bat</h4><p>One-click install: copies plugin to %LOCALAPPDATA%\Roblox\Plugins\ and opens this website.</p></div><button class="int-btn" onclick="downloadBat()">⬇ install-devai.bat</button></div>
-      </div>
+      <div style="text-align:center"><div class="big-status off" id="studioBig"><span class="pulse"></span><span>Waiting for Studio…</span></div></div>
     </div></section>
 
     <section class="page" id="page-scan"><div class="page-pad">
-      <h2>🔍 Project Scan</h2><p class="sub">Analyze your open Roblox place for scripts, remotes, and potential issues.</p>
-      <div style="margin-bottom:16px"><button class="btn-top citrus" onclick="runScan()">🔄 Request Scan from Studio</button></div>
-      <div class="scan-grid" id="scanGrid"></div>
-      <div class="sec-head"><h3>Detection Results</h3></div>
-      <div class="problem-list" id="problemList"><p style="color:var(--muted);font-size:12px">Run a scan to see detected systems and issues.</p></div>
+      <h2>🔍 Project Scan</h2><p class="sub">Request a scan from Studio to see scripts, remotes, objects.</p>
+      <div style="margin-bottom:16px"><button class="btn-top citrus" onclick="reqScan()">🔄 Request Scan</button></div>
+      <div class="scan-grid" id="scanGrid"><div class="scan-stat"><div class="n">—</div><div class="lbl">Scripts</div></div></div>
+      <div id="scanData" style="margin-top:16px;font-size:12px;color:var(--dim);font-family:var(--mono)"></div>
     </div></section>
 
     <section class="page" id="page-output"><div class="page-pad">
-      <h2>📟 Live Roblox Output</h2><p class="sub">Stream errors and prints from Studio. Click an error to ask DevAI to fix it.</p>
-      <div style="margin-bottom:12px;display:flex;gap:8px">
-        <button class="btn-top citrus" onclick="startOutputStream()">▶ Start Streaming</button>
-        <button class="btn-top" onclick="document.getElementById('outBox').innerHTML=''">🗑 Clear</button>
+      <h2>📟 Live Roblox Output</h2><p class="sub">Output streams from Studio when enabled in the plugin.</p>
+      <div style="margin:12px 0;display:flex;gap:8px">
+        <button class="btn-top citrus" onclick="startOutput()">▶ Enable in Plugin</button>
+        <button class="btn-top" onclick="document.getElementById('outBox').innerHTML='';wsSend({type:'clear_output'})">🗑 Clear</button>
         <button class="btn-top" onclick="fixErrors()">🔧 Fix Errors with AI</button>
       </div>
-      <div class="output-box" id="outBox"><div class="out-line">Waiting for Studio output… Click "Start Streaming" and enable Output sharing in the plugin.</div></div>
-    </div></section>
-
-    <section class="page" id="page-integrations"><div class="page-pad">
-      <h2>🔗 Integrations</h2><p class="sub">Connect your accounts and configure AI providers.</p>
-      <div class="sec-head"><h3>Roblox</h3></div><div class="int-list" id="intRoblox"></div>
-      <div class="sec-head"><h3>AI Providers</h3></div><div class="int-list" id="intAI"></div>
-      <div class="sec-head"><h3>Services</h3></div><div class="int-list" id="intServices"></div>
+      <div class="output-box" id="outBox"><div class="out-line">Waiting for Studio output…</div></div>
     </div></section>
 
     <section class="page" id="page-history"><div class="page-pad">
-      <h2>🕐 Version History</h2><p class="sub">Every change DevAI makes is recorded. Roll back any time.</p>
-      <div class="int-list" id="histList" style="margin-top:16px"><p style="color:var(--muted);font-size:12px">History will appear here after the first Send to Studio.</p></div>
+      <h2>🕐 Version History</h2><p class="sub">Every change DevAI makes to your game is recorded with the Studio confirmation result.</p>
+      <div class="int-list" id="histList" style="margin-top:16px"><p style="color:var(--muted);font-size:12px">No changes yet.</p></div>
     </div></section>
 
     <section class="page" id="page-settings"><div class="page-pad">
-      <h2>⚙️ Settings</h2><p class="sub">Configure AI, Studio connection, appearance, and security.</p>
-      <div class="settings-grid" style="margin-top:16px">
-        <div class="set-card">
-          <h3>🤖 AI</h3>
-          <div class="set-row"><label>Default model</label><select id="setDefaultModel"></select></div>
-          <div class="set-row"><label>Auto model selection</label><input type="checkbox" id="setAuto" checked></div>
-          <div class="set-row"><label>Temperature</label><input type="number" id="setTemp" min="0" max="2" step="0.1" value="0.7"></div>
-          <div class="set-row"><label>Max response length</label><input type="number" id="setMaxLen" min="500" max="16000" step="500" value="4000"></div>
-        </div>
-        <div class="set-card">
-          <h3>🔌 Roblox Studio</h3>
-          <div class="set-row"><label>Auto-insert scripts</label><input type="checkbox" id="setAutoInsert" checked></div>
-          <div class="set-row"><label>Confirm before overwriting</label><input type="checkbox" id="setConfirm" checked></div>
-          <div class="set-row"><label>Auto-pull Output errors</label><input type="checkbox" id="setAutoOut"></div>
-          <div class="set-row"><label>Clipboard poll (ms)</label><input type="number" id="setPoll" value="1000" min="300" max="5000" step="100"></div>
-        </div>
-        <div class="set-card">
-          <h3>🎨 Appearance</h3>
-          <div class="set-row"><label>Theme</label><select><option>Dark (Lemonade)</option><option>Midnight</option></select></div>
-          <div class="set-row"><label>Accent color</label><input type="color" value="#d4f522"></div>
-          <div class="set-row"><label>Animations</label><input type="checkbox" checked></div>
-          <div class="set-row"><label>Code font size</label><input type="number" id="setFont" value="12" min="10" max="20"></div>
-        </div>
-        <div class="set-card">
-          <h3>🔑 API Keys (stored locally only)</h3>
-          <div class="set-row"><label>OpenAI</label><input type="password" id="kOpenAI" placeholder="sk-…"></div>
-          <div class="set-row"><label>Anthropic</label><input type="password" id="kAnthropic" placeholder="sk-ant-…"></div>
-          <div class="set-row"><label>Google Gemini</label><input type="password" id="kGemini" placeholder="AIza…"></div>
-          <div class="set-row"><label>DeepSeek</label><input type="password" id="kDeepSeek" placeholder="sk-…"></div>
-          <div class="set-row"><label>Groq</label><input type="password" id="kGroq" placeholder="gsk_…"></div>
-          <div class="set-row"><label>Meshy (3D)</label><input type="password" id="kMeshy"></div>
-          <div style="margin-top:10px"><button class="btn-top citrus" onclick="saveKeys()">💾 Save Keys</button><button class="btn-top" onclick="clearKeys()" style="margin-left:6px">Clear All</button></div>
-          <div style="margin-top:10px;color:var(--muted);font-size:11px;line-height:1.5">Keys stay in your browser's localStorage. They are sent ONLY to the provider's own API when you send a message. The plugin never sees them.</div>
-        </div>
-        <div class="set-card">
-          <h3>🔒 Security</h3>
-          <div class="set-row"><label>Confirm before Delete</label><input type="checkbox" checked></div>
-          <div class="set-row"><label>Confirm before Run</label><input type="checkbox" checked></div>
-          <div class="set-row"><label>Default read-only scan</label><input type="checkbox" checked></div>
-        </div>
+      <h2>⚙️ Settings</h2><p class="sub">API keys are stored in backend/data/keys.json on your local machine — never sent to the browser or plugin.</p>
+      <div class="sec-head"><h3>AI Providers</h3></div>
+      <div class="int-list" id="keyList"></div>
+      <div style="margin-top:12px"><button class="btn-top citrus" onclick="saveKeys()">💾 Save Keys</button></div>
+      <div class="sec-head"><h3>AI Defaults</h3></div>
+      <div class="int-list">
+        <div class="int-item"><div class="int-icon">🤖</div><div class="int-info"><h4>Default model</h4><p>Used when not selecting per-chat.</p></div><select id="setModel" class="int-input" style="width:auto"></select></div>
+        <div class="int-item"><div class="int-icon">⚠️</div><div class="int-info"><h4>Confirm before destructive actions</h4><p>Show diff before overwriting/deleting scripts.</p></div><input type="checkbox" id="setConfirm" checked style="accent-color:var(--citrus);width:18px;height:18px"></div>
       </div>
-      <div style="margin-top:20px;text-align:center;color:var(--muted);font-size:11px">DevAI v25 · Lemonade Studio Bridge · Clipboard protocol · No Python required</div>
+      <div style="margin-top:24px;text-align:center;color:var(--muted);font-size:11px">DevAI v26 · Local backend · Secure bridge · Lemonade-inspired UI</div>
     </div></section>
   </div>
 </div>
+
+<div class="modal-bg" id="diffModal">
+  <div class="modal">
+    <div class="modal-head"><h3>⚠️ Preview Studio Action</h3><button class="modal-close" onclick="closeDiff()">✕</button></div>
+    <div class="modal-body">
+      <div style="margin-bottom:10px;font-size:12px" id="diffMeta"></div>
+      <div class="diff-box" id="diffBox"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeDiff()">Cancel</button>
+      <button class="btn-danger" id="diffReject">Reject</button>
+      <button class="btn-primary" id="diffApply">Apply Changes</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
-<script src="app.js?v=25"></script>
+<script src="app.js?v=26"></script>
 </body>
 </html>
