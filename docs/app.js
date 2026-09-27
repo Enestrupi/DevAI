@@ -1,4 +1,4 @@
-const APP_VERSION = 28;
+const APP_VERSION = 29;
 
 let ws=null, connected=false, studioConnected=false;
 let state = {
