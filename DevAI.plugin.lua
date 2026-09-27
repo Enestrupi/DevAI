@@ -187,6 +187,21 @@ local function ensurePath(path)
     end
     return cur
 end
+local function confirmDialog(title, msg)
+    -- Simple blocking confirmation using a small modal widget inside the plugin
+    local dlg = mk(gui,"Frame",{BackgroundColor3=C.bg2,Size=UDim2.new(0.9,0,0,160),Position=UDim2.new(0.05,0,0.3,0),BorderSizePixel=0,ZIndex=100})
+    mk(dlg,"UICorner",{CornerRadius=UDim.new(0,8)})
+    mk(dlg,"UIStroke",{Color=C.border})
+    mk(dlg,"TextLabel",{BackgroundTransparency=1,Text=title,TextColor3=C.citrus,Font=Enum.Font.GothamBold,TextSize=12,Size=UDim2.new(1,-20,0,22),Position=UDim2.new(0,10,0,10),TextXAlignment=Enum.TextXAlignment.Left})
+    mk(dlg,"TextLabel",{BackgroundTransparency=1,Text=msg,TextColor3=C.text,Font=Enum.Font.Gotham,TextSize=10,Size=UDim2.new(1,-20,0,80),Position=UDim2.new(0,10,0,36),TextXAlignment=Enum.TextXAlignment.Left,TextWrapped=true})
+    local result=false
+    local yes=btn(dlg,"Approve",C.citrus,Color3.new(0,0,0),UDim2.new(0,10,1,-36),UDim2.new(0,90,0,26),function()result=true;dlg:Destroy()end)
+    local no=btn(dlg,"Reject",C.panel,C.red,UDim2.new(1,-110,1,-36),UDim2.new(0,90,0,26),function()result=false;dlg:Destroy()end)
+    -- Wait for click (blocking, same thread)
+    while dlg.Parent do task.wait(0.05) end
+    return result
+end
+
 local function execAction(a)
     local function fail(msg)
         addLog("err",a.op.." failed",msg)
@@ -198,6 +213,17 @@ local function execAction(a)
         post("/api/plugin/result",{token=token,actionId=a.id,success=true,path=p})
     end
     local op = a.op
+    -- Confirmation for destructive operations
+    if op=="delete_instance" or op=="update_script" or op=="move_instance" or op=="rename_instance" then
+        local target = a.params.path or ""
+        local verb = op=="delete_instance" and "DELETE" or (op=="update_script" and "OVERWRITE" or (op=="move_instance" and "MOVE" or "RENAME"))
+        local approved = confirmDialog("⚠ "..verb, target.."\n\nThis modifies an existing instance in your place.\nApprove to execute, Reject to cancel.")
+        if not approved then
+            addLog("err",a.op.." rejected",target)
+            post("/api/plugin/result",{token=token,actionId=a.id,success=false,error="rejected by user"})
+            return
+        end
+    end
     ChangeHistoryService:SetWaypoint("DevAI: "..op)
     if op=="create_instance" then
         local parent,err = ensurePath(a.params.parent or "ServerScriptService")

@@ -26,7 +26,8 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 function connectWS(){
   try{
-    ws = new WebSocket('ws://'+location.hostname+':42069/ws');
+    // Always connect to local backend (must run on user's PC via start-devai.bat)
+    ws = new WebSocket('ws://127.0.0.1:42069/ws');
     ws.onopen=()=>{connected=true;setBackend(true);wsSend({type:'get_models'});wsSend({type:'get_keys'});wsSend({type:'get_history'});};
     ws.onclose=()=>{connected=false;setBackend(false);setStudioConn(false);setTimeout(connectWS,1500);};
     ws.onerror=()=>{setBackend(false);};
@@ -271,10 +272,11 @@ function fixErrors(){
 /* ========= HISTORY ========= */
 function renderHistory(){
   const box=document.getElementById('histList');if(!box)return;
-  if(!state.history.length){box.innerHTML='<p style="color:var(--muted);font-size:12px">No changes yet.</p>';return;}
-  box.innerHTML=state.history.slice(0,100).map(h=>`<div class="int-item"><div class="int-icon">${h.success?'✓':'✗'}</div>
+  if(!state.history.length){box.innerHTML='<p style="color:var(--muted);font-size:12px">No changes yet.</p>';}
+  else box.innerHTML=state.history.slice(0,100).map(h=>`<div class="int-item"><div class="int-icon">${h.success?'✓':'✗'}</div>
     <div class="int-info"><h4>${h.op||'action'} #${h.actionId} — ${h.path||''}</h4><p>${new Date(h.ts).toLocaleString()} ${h.error?'· '+h.error:''}</p></div>
     <span class="int-status ${h.success?'on':'off'}">${h.success?'done':'failed'}</span></div>`).join('');
+  showRecentActivity();updateStudioStatusUI();
 }
 
 /* ========= MODELS ========= */
@@ -331,6 +333,25 @@ handleMsg=function(m){
 };
 
 /* ========= UTILS ========= */
-function toast(msg,kind){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show '+(kind||'');setTimeout(()=>t.classList.remove('show'),2800);}
-function escapeHtml(s){return(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function newProject(){
+  const name=prompt('Project name?');if(!name)return;
+  document.getElementById('curProjName').textContent=name;
+  toast('Project "'+name+'" created','ok');
+}
+function showRecentActivity(){
+  const box=document.getElementById('recentActivity');if(!box)return;
+  if(!state.history.length){box.innerHTML='<p style="color:var(--muted);font-size:12px">Activity will appear after you send scripts to Studio.</p>';return;}
+  box.innerHTML=state.history.slice(0,10).map(h=>{
+    const d=new Date(h.ts);
+    return `<div class="int-item"><div class="int-icon">${h.success?'✓':'✗'}</div>
+    <div class="int-info"><h4>${h.op||'action'} — ${h.path||''}</h4><p>${d.toLocaleString()} ${h.error?'· '+h.error:''}</p></div>
+    <span class="int-status ${h.success?'on':'off'}">${h.success?'done':'failed'}</span></div>`;
+  }).join('');
+}
+function updateStudioStatusUI(){
+  document.getElementById('curProjStatus').textContent=studioConnected?'Connected':'Disconnected';
+  document.getElementById('curProjStatus').style.color=studioConnected?'var(--green)':'var(--red)';
+  document.getElementById('curProjChanges').textContent=state.history.filter(h=>h.ts>Date.now()-86400000).length;
+}
+const _setStudioConn=setStudioConn;setStudioConn=function(on){_setStudioConn(on);updateStudioStatusUI();};
 

@@ -84,8 +84,9 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
     <div class="side-section">
       <div class="side-label">Workspace</div>
       <button class="nav-btn active" data-page="chat" onclick="showPage('chat')"><span class="ic">💬</span>AI Chat</button>
+      <button class="nav-btn" data-page="projects" onclick="showPage('projects')"><span class="ic">📁</span>Projects</button>
       <button class="nav-btn" data-page="studio" onclick="showPage('studio')"><span class="ic">🔌</span>Studio Sync</button>
-      <button class="nav-btn" data-page="scan" onclick="reqScan()"><span class="ic">🔍</span>Project Scan</button>
+      <button class="nav-btn" data-page="scan" onclick="reqScan();showPage('scan')"><span class="ic">🔍</span>Project Scan</button>
       <button class="nav-btn" data-page="output" onclick="showPage('output')"><span class="ic">📟</span>Live Output</button>
       <button class="nav-btn" data-page="history" onclick="showPage('history')"><span class="ic">🕐</span>History</button>
       <button class="nav-btn" data-page="settings" onclick="showPage('settings')"><span class="ic">⚙️</span>Settings</button>
@@ -134,6 +135,19 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
         </div>
       </div>
     </section>
+
+    <section class="page" id="page-projects"><div class="page-pad">
+      <h2>📁 Projects</h2><p class="sub">Your Roblox projects, recent activity, and Studio connection status.</p>
+      <div class="sec-head"><h3>Current Project</h3><button class="btn-top citrus" onclick="newProject()">＋ New Project</button></div>
+      <div class="int-list">
+        <div class="int-item"><div class="int-icon">🎮</div>
+          <div class="int-info"><h4 id="curProjName">My Game</h4><p>Studio: <span id="curProjStatus" style="color:var(--red)">Disconnected</span> · Changes today: <span id="curProjChanges">0</span></p></div>
+          <button class="btn-top" onclick="showPage('chat')">Open Chat</button>
+        </div>
+      </div>
+      <div class="sec-head"><h3>Recent Activity</h3></div>
+      <div class="int-list" id="recentActivity"><p style="color:var(--muted);font-size:12px">Activity will appear after you send scripts to Studio.</p></div>
+    </div></section>
 
     <section class="page" id="page-studio"><div class="page-pad">
       <h2>🔌 Connect Roblox Studio</h2><p class="sub">Pair Studio using a temporary code. Keys and actions route through the local backend.</p>
