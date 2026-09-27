@@ -1,574 +1,381 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>DevAI — Roblox Studio AI Co-Developer</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='52' font-size='52'%3E%E2%9A%94%3C/text%3E%3C/svg%3E">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>DevAI — AI for Roblox Studio</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><text y='52' font-size='56'>⚔</text></svg>">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/core.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/lua.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/javascript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
-:root {
-  --bg:#14100c; --bg2:#1c1610; --panel:#231a12; --panel2:#2c2015; --border:#4a3520;
-  --gold:#c99a3e; --gold-light:#ebbf5b; --bronze:#8a5f2a; --amber:#ff9f2c;
-  --moss:#4d7a35; --red:#c0392b; --orange:#e67e22; --yellow:#f1c40f;
-  --green:#2ecc71; --blue:#3498db; --purple:#9b59b6;
-  --text:#eadfc5; --dim:#a69470; --faint:#726144;
-  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0a;--bg2:#111;--panel:#141414;--panel2:#1a1a1a;--panel3:#222;
+  --border:#222;--border2:#2a2a2a;
+  --citrus:#d4f522;--citrus-dim:#8aab0e;--citrus-glow:rgba(212,245,34,.12);
+  --green:#22c55e;--red:#ef4444;--amber:#f59e0b;--blue:#3b82f6;
+  --text:#f0f0f0;--dim:#999;--muted:#666;--faint:#3a3a3a;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --font:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',Roboto,sans-serif;
 }
-* { box-sizing: border-box; }
-html,body { height:100%; margin:0; background:var(--bg); color:var(--text); font-family:var(--font); }
-body { display:flex; flex-direction:column; overflow:hidden; }
-header {
-  display:flex; align-items:center; gap:16px; padding:10px 18px;
-  background:var(--bg2); border-bottom:1px solid var(--border);
-}
-header h1 { margin:0; font-size:20px; color:var(--gold-light); letter-spacing:1px; font-weight:900; }
-header .badge { background:var(--bronze); color:#14100c; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700; }
-header .status { margin-left:auto; font-size:12px; color:var(--dim); }
-header .status.ok { color:var(--moss); }
-header .status.err { color:var(--red); }
-.app { display:flex; flex:1; min-height:0; }
-nav {
-  width:200px; background:var(--bg2); border-right:1px solid var(--border);
-  padding:10px 8px; display:flex; flex-direction:column; gap:4px; overflow-y:auto;
-}
-nav button {
-  background:transparent; border:none; color:var(--text); padding:10px 12px; text-align:left;
-  font-size:13px; font-weight:700; border-radius:6px; cursor:pointer;
-}
-nav button:hover { background:var(--panel); }
-nav button.active { background:var(--gold); color:#14100c; }
-nav .sep { height:1px; background:var(--border); margin:8px 4px; }
-nav .foot { margin-top:auto; font-size:10px; color:var(--faint); padding:8px; line-height:1.4; }
-main { flex:1; min-width:0; position:relative; overflow:hidden; }
-.page { position:absolute; inset:0; padding:22px 28px; overflow-y:auto; display:none; }
-.page.active { display:block; }
-h2 { color:var(--gold-light); margin:0 0 4px; font-size:24px; letter-spacing:0.5px; }
-.subtitle { color:var(--dim); font-size:13px; margin:0 0 22px; }
-.card {
-  background:var(--panel); border:1px solid var(--border); border-radius:10px;
-  padding:18px; margin-bottom:14px;
-}
-.row { display:flex; gap:12px; margin-bottom:12px; align-items:flex-start; }
-label { display:block; font-weight:700; font-size:12px; color:var(--text); margin-bottom:6px; }
-input[type=text], input[type=password], input[type=number], select, textarea {
-  background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px;
-  padding:10px 12px; font-family:var(--mono); font-size:12px; width:100%;
-}
-textarea { resize:vertical; min-height:90px; }
-input:focus, textarea:focus, select:focus { outline:2px solid var(--gold); border-color:var(--gold); }
-.btn {
-  display:inline-block; background:var(--gold); color:#14100c; border:none; padding:10px 22px;
-  font-weight:900; font-size:13px; border-radius:6px; cursor:pointer; letter-spacing:0.5px;
-}
-.btn:hover { filter:brightness(1.08); }
-.btn.bronze { background:var(--bronze); }
-.btn.green { background:var(--moss); }
-.btn.red { background:var(--red); color:#fff; }
-.btn.ghost { background:var(--panel2); color:var(--text); border:1px solid var(--border); }
-.btn:disabled { opacity:0.5; cursor:not-allowed; }
-.btnrow { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
-.pill { display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700; background:var(--bronze); color:#14100c; margin-right:6px; }
-.msg { padding:12px 14px; border-radius:8px; margin-bottom:10px; max-width:85%; }
-.msg.user { background:var(--panel2); margin-left:auto; border:1px solid var(--gold); }
-.msg.ai { background:var(--panel); margin-right:auto; border:1px solid var(--border); }
-.msg .who { font-size:11px; font-weight:700; margin-bottom:4px; color:var(--amber); }
-.msg.user .who { color:var(--gold-light); }
-.msg pre { background:#0a0705; padding:12px; border-radius:6px; overflow-x:auto; font-size:12px;
-  border:1px solid var(--border); color:var(--moss); font-family:var(--mono); white-space:pre-wrap; }
-.msg code { background:#0a0705; padding:2px 6px; border-radius:4px; color:var(--amber); font-family:var(--mono); font-size:12px; }
-.msg .act { margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; }
-.msg .act button { font-size:11px; padding:6px 12px; }
-#chatList { display:flex; flex-direction:column; gap:2px; }
-#chatInputWrap { position:sticky; bottom:0; background:var(--bg2); padding:12px; border-top:1px solid var(--border); border-radius:0 0 10px 10px; }
-.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-.grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
-@media(max-width:900px){ .grid2,.grid3 { grid-template-columns:1fr; } }
-.status-ok { color:var(--moss); } .status-err { color:var(--red); } .status-warn { color:var(--orange); }
-.progress { background:var(--panel2); border-radius:6px; height:10px; overflow:hidden; margin:10px 0; }
-.progress > div { background:var(--gold); height:100%; width:0%; transition:width 0.3s; }
-.thumb { background:var(--bg); border-radius:8px; width:240px; height:240px; display:flex; align-items:center; justify-content:center; overflow:hidden; }
-.thumb img { max-width:100%; max-height:100%; }
-.download-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
-.download-grid a, .download-grid button {
-  display:block; padding:10px; background:var(--gold); color:#000; text-align:center;
-  border-radius:6px; text-decoration:none; font-weight:700; font-size:12px; border:none; cursor:pointer;
-}
-.download-grid a.ghost, .download-grid button.ghost { background:var(--panel2); color:var(--text); border:1px solid var(--border); }
-select { background:var(--bg); color:var(--text); }
-.tiny { font-size:11px; color:var(--faint); }
-.kbd { background:var(--panel2); padding:2px 6px; border-radius:4px; font-family:var(--mono); font-size:11px; border:1px solid var(--border); }
-.codeblock-toolbar { display:flex; gap:6px; margin-top:8px; }
-iframe.model-viewer { width:100%; height:400px; border:none; border-radius:8px; background:#000; }
-.badge-new { background:var(--moss); color:#000; }
-.toast {
-  position:fixed; bottom:20px; right:20px; background:var(--panel); border:1px solid var(--gold);
-  padding:12px 18px; border-radius:8px; color:var(--text); font-weight:700; z-index:1000;
-  animation: slide 0.2s ease-out;
-}
-@keyframes slide { from { transform:translateY(30px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+html,body{height:100%}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:13px;line-height:1.5;overflow:hidden;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;font-size:13px}
+input,textarea,select{font-family:inherit;font-size:13px}
+code,pre{font-family:var(--mono)}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#2a2a2a;border-radius:4px}::-webkit-scrollbar-thumb:hover{background:#3a3a3a}
+
+.app{display:grid;grid-template-columns:240px 1fr;grid-template-rows:52px 1fr;height:100vh}
+.topbar{grid-column:1/-1;display:flex;align-items:center;padding:0 16px;gap:12px;border-bottom:1px solid var(--border);background:var(--bg2)}
+.logo{font-weight:900;font-size:16px;color:var(--citrus);letter-spacing:.5px;display:flex;align-items:center;gap:8px}
+.logo-mark{width:26px;height:26px;background:var(--citrus);color:#000;border-radius:6px;display:grid;place-items:center;font-size:14px;font-weight:900}
+.project-pill{margin-left:12px;padding:6px 12px;background:var(--panel);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--dim);display:flex;align-items:center;gap:8px}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.conn-pill{display:flex;align-items:center;gap:6px;padding:5px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:999px;font-size:11px;color:var(--dim)}
+.conn-dot{width:8px;height:8px;border-radius:50%;background:var(--red)}.conn-dot.on{background:var(--green);box-shadow:0 0 8px var(--green)}
+.btn-top{padding:6px 12px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text);font-weight:600}
+.btn-top:hover{background:var(--panel3);border-color:var(--citrus)}
+.btn-top.citrus{background:var(--citrus);color:#000;border-color:var(--citrus)}
+.btn-top.citrus:hover{filter:brightness(.9)}
+
+.sidebar{background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.side-section{padding:12px 10px;border-bottom:1px solid var(--border)}
+.side-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding:4px 8px;margin-bottom:6px;font-weight:700}
+.nav-btn{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border-radius:6px;color:var(--dim);font-size:12.5px;font-weight:500;margin-bottom:2px;transition:.15s}
+.nav-btn:hover{background:var(--panel);color:var(--text)}.nav-btn.active{background:var(--citrus-glow);color:var(--citrus);font-weight:600}
+.nav-btn .ic{width:18px;text-align:center;font-size:14px}
+.conv-list{flex:1;overflow-y:auto;padding:8px}
+.conv-item{padding:8px 10px;border-radius:6px;color:var(--dim);font-size:12px;cursor:pointer;margin-bottom:2px;display:flex;align-items:center;gap:8px}
+.conv-item:hover{background:var(--panel);color:var(--text)}.conv-item.active{background:var(--panel2);color:var(--text);border-left:2px solid var(--citrus)}
+.conv-item .pin{color:var(--amber);font-size:10px;margin-left:auto}
+.new-chat{margin:8px 10px;padding:9px;background:var(--citrus);color:#000;border-radius:6px;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px}
+.new-chat:hover{filter:brightness(.9)}
+
+.main{overflow:hidden;display:flex;flex-direction:column;background:var(--bg)}
+.page{display:none;flex-direction:column;flex:1;overflow:hidden}.page.active{display:flex}
+
+.chat-wrap{display:flex;flex-direction:column;flex:1;overflow:hidden;position:relative}
+.chat-header{padding:10px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--bg2)}
+.chat-header h2{font-size:14px;font-weight:700;color:var(--text);flex:1}
+.mode-toggle{display:flex;background:var(--panel);border-radius:6px;padding:3px;border:1px solid var(--border)}
+.mode-btn{padding:5px 12px;font-size:11px;font-weight:600;border-radius:4px;color:var(--dim)}.mode-btn.active{background:var(--citrus);color:#000}
+.chat-messages{flex:1;overflow-y:auto;padding:24px 0}
+.msg{max-width:860px;margin:0 auto 18px;padding:0 24px}.msg.user{display:flex;justify-content:flex-end}
+.msg-bubble{padding:14px 18px;border-radius:12px;font-size:13px;line-height:1.6}
+.msg.user .msg-bubble{background:var(--citrus);color:#000;border-bottom-right-radius:4px;max-width:75%;font-weight:500}
+.msg.ai .msg-bubble{background:var(--panel);border:1px solid var(--border);border-bottom-left-radius:4px;width:100%}
+.ai-badge{display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.ai-avatar{width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,var(--citrus),var(--green));display:grid;place-items:center;font-size:12px;color:#000;font-weight:900}
+.ai-name{font-weight:700;font-size:12px;color:var(--text)}.ai-best{font-size:11px;color:var(--muted);margin-left:4px}
+.ai-provider{font-size:10px;color:var(--muted);margin-left:auto;padding:2px 8px;background:var(--panel2);border-radius:4px}
+.msg-bubble p{margin-bottom:10px}.msg-bubble p:last-child{margin-bottom:0}
+.msg-bubble ul,.msg-bubble ol{padding-left:22px;margin-bottom:10px}.msg-bubble li{margin-bottom:4px}
+.msg-bubble strong{color:var(--citrus)}.msg.user .msg-bubble strong{color:#000}
+.code-block{margin:12px 0;background:#000;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.code-head{display:flex;align-items:center;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);gap:8px}
+.code-lang{font-weight:700;color:var(--citrus);font-family:var(--mono)}.code-path{font-family:var(--mono);color:var(--dim)}
+.code-actions{margin-left:auto;display:flex;gap:6px}
+.code-act{padding:4px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:4px;font-size:10px;font-weight:600;color:var(--text)}
+.code-act:hover{border-color:var(--citrus);color:var(--citrus)}.code-act.send{background:var(--green);color:#000;border-color:var(--green)}
+.code-block pre{padding:12px;overflow-x:auto;font-size:12px;line-height:1.5;background:#000}
+.code-block pre code{background:transparent;padding:0;color:#e5e5e5}
+.inline-code{background:var(--panel2);padding:2px 6px;border-radius:4px;font-family:var(--mono);font-size:12px;color:var(--citrus);border:1px solid var(--border)}
+.msg.user .inline-code{background:rgba(0,0,0,.1);color:#000;border-color:rgba(0,0,0,.15)}
+.plan-card{background:var(--panel2);border:1px solid var(--citrus);border-radius:8px;padding:14px;margin:12px 0}
+.plan-card h4{color:var(--citrus);font-size:12px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.plan-steps{list-style:none;padding:0;margin:0 0 12px}.plan-steps li{padding:6px 0 6px 24px;position:relative;font-size:12px;color:var(--dim);border-bottom:1px solid var(--border)}
+.plan-steps li:last-child{border-bottom:none}.plan-steps li::before{content:attr(data-n);position:absolute;left:0;color:var(--citrus);font-weight:700;font-family:var(--mono);font-size:11px}
+.plan-meta{font-size:11px;color:var(--muted);margin-bottom:12px;display:flex;gap:14px;flex-wrap:wrap}
+.plan-actions{display:flex;gap:8px}.plan-actions button{padding:7px 14px;border-radius:6px;font-size:11px;font-weight:700}
+.plan-build{background:var(--citrus);color:#000}.plan-cancel{background:var(--panel2);color:var(--text);border:1px solid var(--border)}
+
+.input-wrap{padding:16px 24px 20px;border-top:1px solid var(--border);background:var(--bg2)}
+.input-area{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:.2s}
+.input-area:focus-within{border-color:var(--citrus);box-shadow:0 0 0 3px var(--citrus-glow)}
+.input-row{padding:12px 14px;display:flex;align-items:flex-end;gap:10px}
+.input-row textarea{flex:1;background:transparent;border:none;color:var(--text);resize:none;min-height:24px;max-height:200px;outline:none;font-size:13px;line-height:1.5;font-family:var(--font)}
+.send-btn{width:36px;height:36px;border-radius:8px;background:var(--citrus);color:#000;display:grid;place-items:center;font-weight:900;font-size:16px;flex-shrink:0}
+.send-btn:hover{filter:brightness(.9)}.send-btn:disabled{background:var(--faint);color:var(--muted);cursor:not-allowed}
+.input-tools{display:flex;gap:4px;padding:8px 10px;border-top:1px solid var(--border);align-items:center;flex-wrap:wrap}
+.tool-btn{padding:5px 10px;border-radius:6px;color:var(--dim);font-size:11px;display:flex;align-items:center;gap:5px}
+.tool-btn:hover{background:var(--panel2);color:var(--text)}.tool-btn.on{color:var(--citrus);background:var(--citrus-glow)}
+.context-toggle{margin-left:auto;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer}
+.model-pill{padding:5px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;font-size:11px;display:flex;align-items:center;gap:6px;color:var(--dim)}
+.model-pill:hover{border-color:var(--citrus)}.model-pill .dot{width:6px;height:6px;border-radius:50%;background:var(--citrus)}
+.input-hint{font-size:10px;color:var(--muted);text-align:center;margin-top:8px}
+
+.drawer{position:absolute;bottom:80px;left:24px;right:24px;max-width:860px;margin:0 auto;background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.6);z-index:100;display:none;max-height:60vh;overflow-y:auto}
+.drawer.open{display:block}
+.drawer-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center}.drawer-head h3{font-size:13px;font-weight:700;flex:1}
+.drawer-close{width:28px;height:28px;border-radius:6px;display:grid;place-items:center;color:var(--muted)}.drawer-close:hover{background:var(--panel2);color:var(--text)}
+.model-grid{padding:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.model-card{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:12px;cursor:pointer;transition:.15s}
+.model-card:hover{border-color:var(--citrus)}.model-card.sel{border-color:var(--citrus);background:var(--citrus-glow)}
+.model-card h4{font-size:13px;font-weight:700;margin-bottom:2px;display:flex;align-items:center;gap:6px}
+.model-card .provider{font-size:10px;color:var(--muted);margin-bottom:8px}
+.model-card .best{font-size:11px;color:var(--dim);margin-bottom:8px}
+.stars{font-size:10px;color:var(--amber);letter-spacing:1px}.stars .off{color:var(--faint)}
+
+.context-panel{position:absolute;bottom:80px;right:24px;width:280px;background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.6);z-index:100;display:none;padding:14px}
+.context-panel.open{display:block}
+.context-panel h4{font-size:12px;font-weight:700;margin-bottom:10px;color:var(--citrus);display:flex;align-items:center;gap:6px}
+.ctx-item{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:11px;color:var(--dim)}.ctx-item input{accent-color:var(--citrus)}
+.ctx-count{font-size:10px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+
+.page-pad{padding:24px 32px;overflow-y:auto;flex:1}
+.page-pad h2{font-size:20px;font-weight:800;margin-bottom:4px}.page-pad .sub{color:var(--dim);margin-bottom:24px;font-size:13px}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:24px}
+.step-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px}
+.step-num{width:28px;height:28px;border-radius:8px;background:var(--citrus);color:#000;font-weight:900;display:grid;place-items:center;margin-bottom:10px;font-size:12px}
+.step-card h4{font-size:12px;font-weight:700;margin-bottom:6px}.step-card p{font-size:11px;color:var(--dim);line-height:1.5}
+.pairing-box{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:28px;text-align:center;margin-bottom:20px}
+.pairing-code{font-family:var(--mono);font-size:48px;font-weight:900;letter-spacing:8px;color:var(--citrus);background:#000;padding:20px;border-radius:10px;border:1px dashed var(--border);margin:16px 0;user-select:all}
+.pairing-hint{font-size:12px;color:var(--muted)}
+.big-status{display:inline-flex;align-items:center;gap:10px;padding:10px 18px;border-radius:999px;font-size:13px;font-weight:700;margin:16px 0}
+.big-status.off{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+.big-status.on{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.3)}
+.big-status .pulse{width:10px;height:10px;border-radius:50%;background:currentColor;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+.scan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:16px 0}
+.scan-stat{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center}
+.scan-stat .n{font-size:28px;font-weight:900;color:var(--citrus);font-family:var(--mono)}
+.scan-stat .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+.problem-list{margin-top:16px;display:flex;flex-direction:column;gap:8px}
+.problem{background:var(--panel);border-left:3px solid var(--amber);padding:10px 14px;border-radius:0 8px 8px 0;font-size:12px;display:flex;align-items:center;gap:10px}
+.problem.ok{border-left-color:var(--green)}.problem.err{border-left-color:var(--red)}
+.problem .msg2{flex:1;color:var(--dim)}.problem .act{padding:4px 10px;background:var(--panel2);border-radius:4px;font-size:10px;font-weight:700;color:var(--citrus)}
+
+.output-box{background:#000;border:1px solid var(--border);border-radius:8px;padding:12px;font-family:var(--mono);font-size:11px;max-height:300px;overflow-y:auto}
+.out-line{padding:3px 0;color:#999}.out-line.ok{color:var(--green)}.out-line.warn{color:var(--amber)}.out-line.err{color:var(--red)}
+
+.int-list{display:flex;flex-direction:column;gap:8px}
+.int-item{display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--panel);border:1px solid var(--border);border-radius:10px}
+.int-icon{width:36px;height:36px;border-radius:8px;background:var(--panel2);display:grid;place-items:center;font-size:18px}
+.int-info{flex:1}.int-info h4{font-size:13px;font-weight:700}.int-info p{font-size:11px;color:var(--muted)}
+.int-status{font-size:10px;padding:3px 8px;border-radius:4px;font-weight:700}
+.int-status.on{background:rgba(34,197,94,.15);color:var(--green)}.int-status.off{background:rgba(239,68,68,.1);color:var(--red)}
+.int-btn{padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;background:var(--panel2);border:1px solid var(--border);color:var(--text)}
+.int-btn:hover{border-color:var(--citrus);color:var(--citrus)}.int-btn.citrus{background:var(--citrus);color:#000;border-color:var(--citrus)}
+
+.proj-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.proj-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:.15s}
+.proj-card:hover{border-color:var(--citrus);transform:translateY(-2px)}
+.proj-card h3{font-size:14px;font-weight:700;margin-bottom:4px}
+.proj-card .meta{font-size:11px;color:var(--muted);margin-bottom:10px;display:flex;gap:10px}
+.proj-card .conn{font-size:10px;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:4px}
+.proj-card .conn.on{background:rgba(34,197,94,.1);color:var(--green)}.proj-card .conn.off{background:rgba(239,68,68,.1);color:var(--red)}
+
+.settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.set-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:18px}
+.set-card h3{font-size:13px;font-weight:700;color:var(--citrus);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.set-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px}
+.set-row:last-child{border-bottom:none}.set-row label{color:var(--dim)}
+.set-row input[type=text],.set-row input[type=password],.set-row select,.set-row input[type=number]{background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;min-width:180px}
+.set-row input:focus{outline:none;border-color:var(--citrus)}
+
+.sec-head{display:flex;align-items:center;gap:12px;margin-bottom:14px;margin-top:24px}.sec-head:first-child{margin-top:0}
+.sec-head h3{font-size:14px;font-weight:700;flex:1}.sec-head .add{padding:6px 12px;background:var(--citrus);color:#000;border-radius:6px;font-size:11px;font-weight:700}
+
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--panel);border:1px solid var(--border);padding:10px 18px;border-radius:8px;font-size:12px;color:var(--text);z-index:1000;transition:.3s;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+.toast.show{transform:translateX(-50%) translateY(0)}.toast.ok{border-color:var(--green)}.toast.err{border-color:var(--red)}
+
+@media(max-width:768px){.app{grid-template-columns:1fr}.sidebar{position:fixed;left:-280px;top:52px;bottom:0;width:260px;z-index:200;transition:.25s}.sidebar.open{left:0;box-shadow:0 0 40px rgba(0,0,0,.8)}.page-pad{padding:16px}.pairing-code{font-size:30px;letter-spacing:4px;padding:14px}.msg{padding:0 16px}.input-wrap{padding:12px 16px}.model-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-<header>
-  <h1>⚔ DevAI</h1>
-  <span class="badge badge-new">WEB v1.2</span>
-  <span id="connStatus" class="status">Connect your API keys in Settings.</span>
-</header>
 <div class="app">
-  <nav id="nav">
-    <button data-page="home" class="active">🏠 Home</button>
-    <button data-page="chat">💬 AI Chat</button>
-    <button data-page="models">🧊 3D Models</button>
-    <button data-page="thumbnails">🖼 Thumbnails</button>
-    <button data-page="gui">🎨 GUI Generator</button>
-    <button data-page="code">📜 Luau Code</button>
-    <button data-page="animations">💃 Animations</button>
-    <div class="sep"></div>
-    <button data-page="studio">🔌 Studio Sync</button>
-    <button data-page="settings">⚙ Settings</button>
-    <div class="foot">
-      DevAI is a standalone web assistant for Roblox developers.
-      Free tier: OpenRouter-Free chat (100%) + Meshy 3D (200 cred/mo).
-      Nothing leaves your browser except to the providers you configure.
+  <div class="topbar">
+    <div class="logo"><span class="logo-mark">⚔</span>DevAI</div>
+    <div class="project-pill" id="projPill">📁 <span id="projName">My Game</span></div>
+    <div class="topbar-right">
+      <div class="conn-pill"><span class="conn-dot" id="connDot"></span><span id="connLabel">Disconnected</span></div>
+      <button class="btn-top" onclick="showPage('studio')">🔌 Connect</button>
+      <button class="btn-top citrus" onclick="newChat()">＋ New Chat</button>
     </div>
-  </nav>
-  <main>
-    <!-- HOME -->
-    <section class="page active" id="page-home">
-      <h2>⚔ DevAI</h2>
-      <p class="subtitle">Browser-based AI co-developer for Roblox — chat, generate 3D meshes, thumbnails, GUIs, animations, and Luau. All in one place, no Studio plugin required (though there's one if you want it).</p>
-      <div class="grid2">
-        <div class="card">
-          <h3 style="color:var(--gold-light); margin-top:0;">Quick start</h3>
-          <ol style="color:var(--text); line-height:1.8; font-size:13px; padding-left:20px;">
-            <li>Open <b>⚙ Settings</b> and paste an <b>OpenRouter</b> key (free from <a href="https://openrouter.ai/keys" target="_blank" style="color:var(--amber)">openrouter.ai/keys</a>). This powers chat, code, GUI, and thumbnails.</li>
-            <li>(Optional) Paste a <b>Meshy</b> key from <a href="https://www.meshy.ai/settings/api" target="_blank" style="color:var(--amber)">meshy.ai/settings/api</a> for 3D model generation. 200 free credits/month, no credit card.</li>
-            <li>Use the tabs above to build what you need. Copy Luau code into Studio, or download GLB/PNG files and drag them into your place.</li>
-          </ol>
-        </div>
-        <div class="card">
-          <h3 style="color:var(--gold-light); margin-top:0;">What's in each tab</h3>
-          <ul style="color:var(--text); line-height:1.7; font-size:13px; padding-left:20px;">
-            <li><b>💬 Chat</b> — Roblox-specialized AI assistant. Luau-aware, knows services/Remotes/DataStores.</li>
-            <li><b>🧊 3D Models</b> — Text → GLB/FBX mesh (Meshy). Preview in 3D, download, rig with walk/run.</li>
-            <li><b>🖼 Thumbnails</b> — Generate Roblox thumbnails/icons with character/set prompts.</li>
-            <li><b>🎨 GUI</b> — Describe a menu/HUD/shop → get a Luau LocalScript that builds it.</li>
-            <li><b>📜 Luau Code</b> — Focused code generation (pick Script/LocalScript/ModuleScript, target service).</li>
-            <li><b>💃 Animations</b> — Generate AnimationController scripts + list of IDs; rig humanoids from Meshy.</li>
-            <li><b>🔌 Studio Sync</b> — Session code to pair with the DevAI Roblox plugin (future auto-sync).</li>
-          </ul>
-        </div>
-      </div>
-      <div class="card">
-        <h3 style="color:var(--gold-light); margin-top:0;">Try it now</h3>
-        <div class="btnrow">
-          <button class="btn" onclick="goPage('chat')">💬 Open Chat</button>
-          <button class="btn bronze" onclick="goPage('models')">🧊 Make a 3D Model</button>
-          <button class="btn ghost" onclick="goPage('settings')">⚙ Add API Keys</button>
-        </div>
-      </div>
-    </section>
+  </div>
 
-    <!-- CHAT -->
-    <section class="page" id="page-chat">
-      <h2>💬 AI Chat</h2>
-      <p class="subtitle">Ask for scripts, debug errors, plan systems. Code blocks come with a copy button and (when ready) a Send-to-Studio shortcut.</p>
-      <div class="card" style="padding:0;">
-        <div id="chatList" style="padding:16px; min-height:400px; max-height:calc(100vh - 400px); overflow-y:auto;"></div>
-        <div id="chatInputWrap">
-          <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
-            <label class="tiny" style="margin:0; font-weight:700; color:var(--dim);">MODEL:</label>
-            <select id="chatModelPicker" style="width:auto; min-width:260px; padding:6px 10px; font-size:11px;"></select>
-            <span id="chatModelBadge" class="tiny" style="color:var(--moss); font-weight:700;">NO KEY</span>
-          </div>
-          <textarea id="chatInput" placeholder='e.g. "Create a round-system ModuleScript with intermission/round/end phases, using CollectionService tags and a RemoteEvent in ReplicatedStorage.Remotes."'
-            style="width:100%; min-height:70px;"></textarea>
-          <div class="btnrow">
-            <button class="btn" id="sendChat">SEND ▶</button>
-            <button class="btn ghost" id="clearChat">🧹 Clear</button>
-            <button class="btn red" id="resetConn" title="Wipes any saved key/model and switches back to free Pollinations">🔄 Reset Connection</button>
-            <span class="tiny" style="margin-left:auto; align-self:center;">Model: <span id="chatModelLabel">—</span></span>
-          </div>
-        </div>
-      </div>
-    </section>
+  <div class="sidebar" id="sidebar">
+    <div class="side-section">
+      <div class="side-label">Workspace</div>
+      <button class="nav-btn active" data-page="chat" onclick="showPage('chat')"><span class="ic">💬</span>AI Chat</button>
+      <button class="nav-btn" data-page="projects" onclick="showPage('projects')"><span class="ic">📁</span>Projects</button>
+      <button class="nav-btn" data-page="models" onclick="showPage('models')"><span class="ic">🧠</span>AI Models</button>
+      <button class="nav-btn" data-page="studio" onclick="showPage('studio')"><span class="ic">🔌</span>Studio Sync</button>
+      <button class="nav-btn" data-page="scan" onclick="showPage('scan')"><span class="ic">🔍</span>Project Scan</button>
+      <button class="nav-btn" data-page="output" onclick="showPage('output')"><span class="ic">📟</span>Live Output</button>
+      <button class="nav-btn" data-page="integrations" onclick="showPage('integrations')"><span class="ic">🔗</span>Integrations</button>
+      <button class="nav-btn" data-page="history" onclick="showPage('history')"><span class="ic">🕐</span>History</button>
+      <button class="nav-btn" data-page="settings" onclick="showPage('settings')"><span class="ic">⚙️</span>Settings</button>
+    </div>
+    <div class="side-label" style="padding:8px 18px 4px">Conversations</div>
+    <div class="conv-list" id="convList"></div>
+    <button class="new-chat" onclick="newChat()">＋ New Conversation</button>
+  </div>
 
-    <!-- 3D MODELS -->
-    <section class="page" id="page-models">
-      <h2>🧊 AI 3D Models</h2>
-      <p class="subtitle">Generate a textured GLB/FBX mesh from text. Powered by Meshy (free 200 credits/month). Requires a Meshy API key in Settings.</p>
-      <div class="card">
-        <label>Prompt</label>
-        <textarea id="meshPrompt" placeholder="A weathered golden-brown stone sword with bronze hilt and glowing amber runes, fantasy game asset, centered, high detail"></textarea>
-        <div class="row" style="margin-top:10px;">
-          <div style="flex:1;">
-            <label>Art style</label>
-            <select id="meshStyle">
-              <option value="realistic">realistic</option>
-              <option value="cartoon">cartoon</option>
-              <option value="low-poly">low-poly</option>
-              <option value="sculpture">sculpture</option>
-            </select>
+  <div class="main">
+    <section class="page active" id="page-chat">
+      <div class="chat-wrap">
+        <div class="chat-header">
+          <h2 id="chatTitle">New Chat</h2>
+          <div class="mode-toggle">
+            <button class="mode-btn active" data-mode="build" onclick="setMode('build')">🔨 Build</button>
+            <button class="mode-btn" data-mode="design" onclick="setMode('design')">🎨 Design</button>
           </div>
-          <div style="flex:1;">
-            <label>Height (meters, for rig)</label>
-            <input type="number" id="meshHeight" value="1.7" step="0.1" min="0.5" max="4"/>
-          </div>
+          <button class="btn-top" onclick="regenLast()" title="Regenerate">↻</button>
         </div>
-        <div class="btnrow">
-          <button class="btn" id="meshGenerate">✨ GENERATE PREVIEW</button>
-          <button class="btn bronze" id="meshRefine" disabled>🌟 REFINE (PBR)</button>
-          <button class="btn green" id="meshRig" disabled>🦴 RIG + WALK/RUN</button>
-          <span id="meshStatus" class="tiny" style="align-self:center;"></span>
+        <div class="chat-messages" id="chatMsgs"></div>
+        <div class="drawer" id="modelDrawer">
+          <div class="drawer-head"><h3>🧠 Select AI Model</h3><button class="drawer-close" onclick="toggleDrawer()">✕</button></div>
+          <div class="model-grid" id="modelGrid"></div>
         </div>
-        <div class="progress" id="meshProgress" style="display:none;"><div></div></div>
-      </div>
-      <div class="card" id="meshPreview" style="display:none;">
-        <h3 style="color:var(--moss); margin-top:0;">👁 Preview</h3>
-        <div id="meshPreviewBody"></div>
-      </div>
-      <div class="card" id="meshResult" style="display:none;">
-        <h3 style="color:var(--moss); margin-top:0;" id="meshResultTitle">✅ Model ready</h3>
-        <div class="row">
-          <div class="thumb" style="width:260px; height:260px;">
-            <img id="meshThumb" alt="preview"/>
-          </div>
-          <div style="flex:1;">
-            <div class="grid2">
-              <div>
-                <h4 style="margin:0 0 8px; color:var(--gold-light);">Mesh files</h4>
-                <div class="download-grid">
-                  <a id="dlGlb" class="ghost" target="_blank">⬇ GLB</a>
-                  <a id="dlFbx" class="ghost" target="_blank">⬇ FBX</a>
-                  <a id="dlObj" class="ghost" target="_blank">⬇ OBJ</a>
-                  <button class="ghost" id="copyGlb">📋 Copy GLB</button>
-                </div>
-              </div>
-              <div>
-                <h4 style="margin:0 0 8px; color:var(--gold-light);">Rig + Animations</h4>
-                <div class="download-grid" id="rigLinks" style="display:none;">
-                  <a id="dlRigGlb" target="_blank">🦴 Rigged GLB</a>
-                  <a id="dlRigFbx" class="ghost" target="_blank">🦴 Rigged FBX</a>
-                  <a id="dlWalk" class="ghost" target="_blank">🚶 Walk FBX</a>
-                  <a id="dlRun" class="ghost" target="_blank">🏃 Run FBX</a>
-                </div>
-                <p id="rigHint" class="tiny" style="margin-top:8px;">Click 🦴 RIG to auto-skeleton a humanoid character and generate walk/run animations (5 credits). Works best on bipedal characters facing +Z.</p>
-              </div>
+        <div class="context-panel" id="ctxPanel">
+          <h4>📋 Project Context</h4>
+          <label class="ctx-item"><input type="checkbox" id="ctx1" checked>Current Script</label>
+          <label class="ctx-item"><input type="checkbox" id="ctx2" checked>Selected Instance</label>
+          <label class="ctx-item"><input type="checkbox" id="ctx3" checked>Project Structure</label>
+          <label class="ctx-item"><input type="checkbox" id="ctx4">Workspace</label>
+          <label class="ctx-item"><input type="checkbox" id="ctx5">Output Errors</label>
+          <label class="ctx-item"><input type="checkbox" id="ctx6">UI Hierarchy</label>
+          <label class="ctx-item"><input type="checkbox" id="ctx7">All Scripts</label>
+          <label class="ctx-item"><input type="checkbox" id="ctx8">Terrain</label>
+          <label class="ctx-item"><input type="checkbox" id="ctx9">NPCs</label>
+          <div class="ctx-count"><span id="ctxCount">3</span> selected — sent with next message</div>
+        </div>
+        <div class="input-wrap">
+          <div class="input-area">
+            <div class="input-row">
+              <textarea id="userInput" rows="1" placeholder="Ask DevAI anything… (/create, /scan, /fix, /explain)" onkeydown="onKey(event)" oninput="autoGrow(this)"></textarea>
+              <button class="send-btn" id="sendBtn" onclick="sendMsg()" title="Send (Enter)">➤</button>
             </div>
-            <p class="tiny" style="margin-top:12px;">Tip for Roblox: download GLB → in Studio, right-click Meshes → Insert Mesh → select the file, or use Asset Manager → Bulk Import. Use the FBX with the Animation Editor plugin to retarget walk/run to R15.</p>
+            <div class="input-tools">
+              <button class="tool-btn" title="Attach">📷</button>
+              <button class="tool-btn" onclick="showCmds()">⚡ Commands</button>
+              <button class="tool-btn" onclick="stopGen()" id="stopBtn" style="display:none">⏹ Stop</button>
+              <button class="model-pill" onclick="toggleDrawer()"><span class="dot"></span><span id="modelPill">Auto</span> ▾</button>
+              <button class="context-toggle" onclick="toggleCtx()">📋 Context ▾</button>
+            </div>
           </div>
-        </div>
-        <h4 style="margin:14px 0 6px; color:var(--gold-light);">Live 3D preview</h4>
-        <model-viewer id="meshViewer" class="iframe model-viewer" camera-controls auto-rotate ar shadow-intensity="1" exposure="1" style="height:380px;background:#0a0705;border-radius:8px;" src="" alt="3D preview"></model-viewer>
-      </div>
-    </section>
-
-    <!-- THUMBNAILS -->
-    <section class="page" id="page-thumbnails">
-      <h2>🖼 Thumbnails & Icons</h2>
-      <p class="subtitle">Generate Roblox game thumbnails, icons, GFX. Uses an image-generation model through your OpenRouter key (pick a FLUX/Midjourney-style model in Settings) or any OpenAI Images-compatible endpoint.</p>
-      <div class="card">
-        <label>Scene description</label>
-        <textarea id="thumbPrompt" placeholder="A Roblox knight in golden-brown armor standing in an ancient jungle castle courtyard, volumetric god rays, moss-covered stones, cinematic, dramatic lighting, 1920x1080 thumbnail"></textarea>
-        <div class="row" style="margin-top:10px;">
-          <div style="flex:1;">
-            <label>Style</label>
-            <select id="thumbStyle">
-              <option value="cinematic">Cinematic Blender GFX</option>
-              <option value="cartoon">Cartoon high-CTR</option>
-              <option value="icon">Game icon (512x512)</option>
-            </select>
-          </div>
-          <div style="flex:1;">
-            <label>Image endpoint</label>
-            <select id="thumbEndpoint">
-              <option value="openrouter">OpenRouter chat-to-image (use vision model)</option>
-              <option value="pollinations" selected>Pollinations (free, no key)</option>
-            </select>
-          </div>
-        </div>
-        <div class="btnrow">
-          <button class="btn" id="thumbGenerate">🎨 GENERATE</button>
-          <span id="thumbStatus" class="tiny"></span>
-        </div>
-      </div>
-      <div class="card" id="thumbResult" style="display:none;">
-        <a id="thumbLink" target="_blank"><img id="thumbImg" style="max-width:100%; border-radius:8px; border:1px solid var(--border);"/></a>
-        <div class="btnrow">
-          <a id="thumbDl" class="btn" download="thumbnail.png" target="_blank">⬇ Download PNG</a>
-          <button class="btn ghost" id="thumbCopy">📋 Copy URL</button>
+          <div class="input-hint">DevAI can make mistakes. Always review code before sending to Studio. <b>Enter</b> to send, <b>Shift+Enter</b> for newline.</div>
         </div>
       </div>
     </section>
 
-    <!-- GUI GENERATOR -->
-    <section class="page" id="page-gui">
-      <h2>🎨 GUI Generator</h2>
-      <p class="subtitle">Describe an in-game menu/HUD/shop → get a LocalScript that builds it with matching gold-brown DevAI theme (or tell it to match your game).</p>
-      <div class="card">
-        <label>Describe your UI</label>
-        <textarea id="guiPrompt" placeholder="A medieval-themed main menu with 'Play', 'Shop', 'Settings' buttons, gold-bordered frame, amber highlight on hover, parchment background, centered on the screen."></textarea>
-        <div class="btnrow">
-          <button class="btn" id="guiGenerate">✨ GENERATE UI SCRIPT</button>
-          <span id="guiStatus" class="tiny"></span>
-        </div>
-      </div>
-      <div class="card" id="guiResult" style="display:none;">
-        <h4 style="color:var(--moss); margin-top:0;">LocalScript output</h4>
-        <pre id="guiCode" style="background:#0a0705;padding:14px;border-radius:6px;color:var(--moss);border:1px solid var(--border);font-family:var(--mono);font-size:12px;white-space:pre-wrap;max-height:500px;overflow:auto;"></pre>
-        <div class="btnrow">
-          <button class="btn" id="guiCopy">📋 Copy Luau</button>
-          <button class="btn ghost" id="guiDownload">⬇ Download .lua</button>
-          <button class="btn" id="guiSend" style="background:var(--moss);">📤 Send to Studio (LocalScript)</button>
-        </div>
-        <p class="tiny">Put it in <span class="kbd">StarterPlayerScripts</span> as a LocalScript.</p>
-      </div>
-    </section>
+    <section class="page" id="page-projects"><div class="page-pad">
+      <h2>📁 My Projects</h2><p class="sub">Each project stores its own conversations, scripts, and Studio connection.</p>
+      <div class="sec-head"><h3>Active Projects</h3><button class="add" onclick="newProject()">＋ New Project</button></div>
+      <div class="proj-grid" id="projGrid"></div>
+    </div></section>
 
-    <!-- CODE -->
-    <section class="page" id="page-code">
-      <h2>📜 Focused Luau Code</h2>
-      <p class="subtitle">Generate a specific script type with a target service. Good for isolated systems.</p>
-      <div class="card">
-        <div class="row">
-          <div style="flex:1;">
-            <label>Script type</label>
-            <select id="codeType">
-              <option>Script (Server)</option>
-              <option>LocalScript</option>
-              <option>ModuleScript</option>
-            </select>
-          </div>
-          <div style="flex:2;">
-            <label>Target path</label>
-            <input type="text" id="codeTarget" value="ServerScriptService.Systems"/>
-          </div>
-          <div style="flex:1;">
-            <label>Name</label>
-            <input type="text" id="codeName" value="CombatSystem"/>
-          </div>
+    <section class="page" id="page-models"><div class="page-pad">
+      <h2>🧠 AI Models</h2><p class="sub">Select which AI powers DevAI. Add your own API keys in Settings for live AI, or use the built-in templates.</p>
+      <div class="model-grid" id="modelsPageGrid" style="margin-top:16px"></div>
+    </div></section>
+
+    <section class="page" id="page-studio"><div class="page-pad">
+      <h2>🔌 Connect Roblox Studio</h2><p class="sub">Pair Studio with DevAI to send scripts directly into your game — no servers, no Python.</p>
+      <div class="steps">
+        <div class="step-card"><div class="step-num">1</div><h4>Install Plugin</h4><p>Download DevAI-v6.zip, extract, run install-devai.bat — or drop DevAI.plugin.lua into your Plugins folder.</p></div>
+        <div class="step-card"><div class="step-num">2</div><h4>Open Studio</h4><p>Launch Roblox Studio and open any place.</p></div>
+        <div class="step-card"><div class="step-num">3</div><h4>Open Plugin</h4><p>Plugins tab → click DevAI. The Lemonade Studio Bridge panel opens.</p></div>
+        <div class="step-card"><div class="step-num">4</div><h4>Pair</h4><p>Click "Generate New Code" below, then press the ↻ Refresh button in the plugin. It picks up the code automatically.</p></div>
+        <div class="step-card"><div class="step-num">5</div><h4>You're live</h4><p>Green dot appears top-right. Every "Send to Studio" inserts instantly.</p></div>
+      </div>
+      <div class="pairing-box">
+        <h3 style="font-size:14px;margin-bottom:4px">PAIRING CODE</h3>
+        <div class="pairing-code" id="pairCode">----</div>
+        <button class="btn-top citrus" onclick="genPairCode()" style="margin-right:8px">🔄 Generate New Code</button>
+        <button class="btn-top" onclick="copyPair()">📋 Copy to Clipboard</button>
+        <div class="pairing-hint" style="margin-top:12px">The plugin polls your clipboard every second. Once it sees the pairing tag it connects automatically.</div>
+      </div>
+      <div id="studioConnBox" style="text-align:center"><div class="big-status off" id="studioStatusBig"><span class="pulse"></span><span>Waiting for Studio…</span></div></div>
+      <div class="sec-head"><h3>Downloads</h3></div>
+      <div class="int-list">
+        <div class="int-item"><div class="int-icon">📥</div><div class="int-info"><h4>Plugin (v6 — Lemonade Studio Bridge)</h4><p>Clipboard bridge, auto-insert, project scan, output streaming.</p></div><button class="int-btn citrus" onclick="downloadPlugin()">⬇ DevAI-v6.zip</button></div>
+        <div class="int-item"><div class="int-icon">📋</div><div class="int-info"><h4>install-devai.bat</h4><p>One-click install: copies plugin to %LOCALAPPDATA%\Roblox\Plugins\ and opens this website.</p></div><button class="int-btn" onclick="downloadBat()">⬇ install-devai.bat</button></div>
+      </div>
+    </div></section>
+
+    <section class="page" id="page-scan"><div class="page-pad">
+      <h2>🔍 Project Scan</h2><p class="sub">Analyze your open Roblox place for scripts, remotes, and potential issues.</p>
+      <div style="margin-bottom:16px"><button class="btn-top citrus" onclick="runScan()">🔄 Request Scan from Studio</button></div>
+      <div class="scan-grid" id="scanGrid"></div>
+      <div class="sec-head"><h3>Detection Results</h3></div>
+      <div class="problem-list" id="problemList"><p style="color:var(--muted);font-size:12px">Run a scan to see detected systems and issues.</p></div>
+    </div></section>
+
+    <section class="page" id="page-output"><div class="page-pad">
+      <h2>📟 Live Roblox Output</h2><p class="sub">Stream errors and prints from Studio. Click an error to ask DevAI to fix it.</p>
+      <div style="margin-bottom:12px;display:flex;gap:8px">
+        <button class="btn-top citrus" onclick="startOutputStream()">▶ Start Streaming</button>
+        <button class="btn-top" onclick="document.getElementById('outBox').innerHTML=''">🗑 Clear</button>
+        <button class="btn-top" onclick="fixErrors()">🔧 Fix Errors with AI</button>
+      </div>
+      <div class="output-box" id="outBox"><div class="out-line">Waiting for Studio output… Click "Start Streaming" and enable Output sharing in the plugin.</div></div>
+    </div></section>
+
+    <section class="page" id="page-integrations"><div class="page-pad">
+      <h2>🔗 Integrations</h2><p class="sub">Connect your accounts and configure AI providers.</p>
+      <div class="sec-head"><h3>Roblox</h3></div><div class="int-list" id="intRoblox"></div>
+      <div class="sec-head"><h3>AI Providers</h3></div><div class="int-list" id="intAI"></div>
+      <div class="sec-head"><h3>Services</h3></div><div class="int-list" id="intServices"></div>
+    </div></section>
+
+    <section class="page" id="page-history"><div class="page-pad">
+      <h2>🕐 Version History</h2><p class="sub">Every change DevAI makes is recorded. Roll back any time.</p>
+      <div class="int-list" id="histList" style="margin-top:16px"><p style="color:var(--muted);font-size:12px">History will appear here after the first Send to Studio.</p></div>
+    </div></section>
+
+    <section class="page" id="page-settings"><div class="page-pad">
+      <h2>⚙️ Settings</h2><p class="sub">Configure AI, Studio connection, appearance, and security.</p>
+      <div class="settings-grid" style="margin-top:16px">
+        <div class="set-card">
+          <h3>🤖 AI</h3>
+          <div class="set-row"><label>Default model</label><select id="setDefaultModel"></select></div>
+          <div class="set-row"><label>Auto model selection</label><input type="checkbox" id="setAuto" checked></div>
+          <div class="set-row"><label>Temperature</label><input type="number" id="setTemp" min="0" max="2" step="0.1" value="0.7"></div>
+          <div class="set-row"><label>Max response length</label><input type="number" id="setMaxLen" min="500" max="16000" step="500" value="4000"></div>
         </div>
-        <label style="margin-top:10px;">Description</label>
-        <textarea id="codePrompt" placeholder="A sword-combat system with left-click swing, 1.2s cooldown, damage via a RemoteEvent, server-side validation, CollectionService-tagged swords."></textarea>
-        <div class="btnrow">
-          <button class="btn" id="codeGenerate">✨ GENERATE SCRIPT</button>
-          <span id="codeStatus" class="tiny"></span>
+        <div class="set-card">
+          <h3>🔌 Roblox Studio</h3>
+          <div class="set-row"><label>Auto-insert scripts</label><input type="checkbox" id="setAutoInsert" checked></div>
+          <div class="set-row"><label>Confirm before overwriting</label><input type="checkbox" id="setConfirm" checked></div>
+          <div class="set-row"><label>Auto-pull Output errors</label><input type="checkbox" id="setAutoOut"></div>
+          <div class="set-row"><label>Clipboard poll (ms)</label><input type="number" id="setPoll" value="1000" min="300" max="5000" step="100"></div>
+        </div>
+        <div class="set-card">
+          <h3>🎨 Appearance</h3>
+          <div class="set-row"><label>Theme</label><select><option>Dark (Lemonade)</option><option>Midnight</option></select></div>
+          <div class="set-row"><label>Accent color</label><input type="color" value="#d4f522"></div>
+          <div class="set-row"><label>Animations</label><input type="checkbox" checked></div>
+          <div class="set-row"><label>Code font size</label><input type="number" id="setFont" value="12" min="10" max="20"></div>
+        </div>
+        <div class="set-card">
+          <h3>🔑 API Keys (stored locally only)</h3>
+          <div class="set-row"><label>OpenAI</label><input type="password" id="kOpenAI" placeholder="sk-…"></div>
+          <div class="set-row"><label>Anthropic</label><input type="password" id="kAnthropic" placeholder="sk-ant-…"></div>
+          <div class="set-row"><label>Google Gemini</label><input type="password" id="kGemini" placeholder="AIza…"></div>
+          <div class="set-row"><label>DeepSeek</label><input type="password" id="kDeepSeek" placeholder="sk-…"></div>
+          <div class="set-row"><label>Groq</label><input type="password" id="kGroq" placeholder="gsk_…"></div>
+          <div class="set-row"><label>Meshy (3D)</label><input type="password" id="kMeshy"></div>
+          <div style="margin-top:10px"><button class="btn-top citrus" onclick="saveKeys()">💾 Save Keys</button><button class="btn-top" onclick="clearKeys()" style="margin-left:6px">Clear All</button></div>
+          <div style="margin-top:10px;color:var(--muted);font-size:11px;line-height:1.5">Keys stay in your browser's localStorage. They are sent ONLY to the provider's own API when you send a message. The plugin never sees them.</div>
+        </div>
+        <div class="set-card">
+          <h3>🔒 Security</h3>
+          <div class="set-row"><label>Confirm before Delete</label><input type="checkbox" checked></div>
+          <div class="set-row"><label>Confirm before Run</label><input type="checkbox" checked></div>
+          <div class="set-row"><label>Default read-only scan</label><input type="checkbox" checked></div>
         </div>
       </div>
-      <div class="card" id="codeResult" style="display:none;">
-        <h4 style="color:var(--moss); margin-top:0;" id="codeTitle">Generated Script</h4>
-        <pre id="codeBlock" style="background:#0a0705;padding:14px;border-radius:6px;color:var(--moss);border:1px solid var(--border);font-family:var(--mono);font-size:12px;white-space:pre-wrap;max-height:600px;overflow:auto;"></pre>
-        <div class="btnrow">
-          <button class="btn" id="codeCopy">📋 Copy Luau</button>
-          <button class="btn ghost" id="codeDownload">⬇ Download .lua</button>
-          <button class="btn" id="codeSend" style="background:var(--moss);">📤 Send to Studio</button>
-        </div>
-      </div>
-    </section>
-
-    <!-- ANIMATIONS -->
-    <section class="page" id="page-animations">
-      <h2>💃 Animations</h2>
-      <p class="subtitle">Generate Luau that loads & plays R15 animations from IDs, sets up an AnimationController, or hooks walk/run idle blends. The 🧊 3D Models tab can rig Meshy characters and generate walk/run FBX files you can upload to Roblox.</p>
-      <div class="grid2">
-        <div class="card">
-          <h3 style="color:var(--gold-light); margin-top:0;">Animation player script</h3>
-          <label>Animation IDs (comma-separated)</label>
-          <input type="text" id="animIds" value="rbxassetid://180426354"/>
-          <label>Humanoid location</label>
-          <input type="text" id="animParent" value="script.Parent.Humanoid"/>
-          <label>Trigger key</label>
-          <input type="text" id="animKey" value="F"/>
-          <div class="btnrow">
-            <button class="btn" id="animGen">✨ GENERATE ANIMATION SCRIPT</button>
-          </div>
-        </div>
-        <div class="card" id="animResultCard" style="display:none;">
-          <h4 style="color:var(--moss); margin-top:0;">LocalScript</h4>
-          <pre id="animCode" style="background:#0a0705;padding:12px;border-radius:6px;color:var(--moss);border:1px solid var(--border);font-family:var(--mono);font-size:11px;white-space:pre-wrap;max-height:420px;overflow:auto;"></pre>
-          <div class="btnrow">
-            <button class="btn" id="animCopy">📋 Copy</button>
-            <button class="btn ghost" id="animDownload">⬇ Download</button>
-            <button class="btn" id="animSend" style="background:var(--moss);">📤 Send to Studio (LocalScript)</button>
-          </div>
-        </div>
-      </div>
-      <div class="card">
-        <h3 style="color:var(--gold-light); margin-top:0;">Animation ID pack (default Roblox IDs)</h3>
-        <div class="grid3" style="font-size:12px; font-family:var(--mono); color:var(--text);">
-          <div>Idle: rbxassetid://180435571</div>
-          <div>Walk: rbxassetid://180426354</div>
-          <div>Run: rbxassetid://180426354</div>
-          <div>Jump: rbxassetid://125750702</div>
-          <div>Fall: rbxassetid://180436148</div>
-          <div>Climb: rbxassetid://180436334</div>
-          <div>Sword slash: rbxassetid://522635456</div>
-          <div>Tool grip: rbxassetid://548780605</div>
-          <div>Wave: rbxassetid://128777933</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- STUDIO SYNC -->
-    <section class="page" id="page-studio">
-      <h2>🔌 Studio Sync</h2>
-      <p class="subtitle">Lemonade-style direct connection via local bridge (no relays, no ad-blocker issues, no session codes).</p>
-
-      <div class="card">
-        <h3 style="color:var(--gold-light); margin-top:0;">How to connect (3 steps)</h3>
-        <ol style="color:var(--text);font-size:12px;line-height:1.8;padding-left:20px;">
-          <li><b>Install plugin</b> (one-time): extract <code>DevAI-v4.zip</code>, double-click <code>start-devai.bat</code> — it auto-installs the plugin for you.</li>
-          <li><b>Open Roblox Studio</b>, click the ⚔ DevAI button on the Plugins tab.</li>
-          <li><b>Double-click <code>start-devai.bat</code></b> (keep the black window open). It starts the bridge AND opens this website automatically — you'll see 🟢 Connected below in ~3 seconds.</li>
-        </ol>
-        <p class="tiny" style="color:var(--text-faint);margin:0;">The bridge is a tiny Python server running only on <code>127.0.0.1:42069</code> (your own computer). Nothing leaves your PC except AI requests to Pollinations/OpenRouter.</p>
-      </div>
-
-      <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-          <h3 style="color:var(--gold-light); margin:0;">🟢 Connection status</h3>
-          <div style="display:flex; gap:6px;">
-            <button class="btn ghost" id="testRelay" style="font-size:11px;">🔍 Check bridge</button>
-            <button class="btn moss" id="startListen">👂 Start listening</button>
-          </div>
-        </div>
-        <div id="relayTestResults" style="margin-top:8px;font-size:11px;font-family:var(--mono);"></div>
-        <span id="studioStatus" class="tiny" style="display:block;margin-top:6px;color:var(--dim);">⚪ Not connected. Click "Check bridge" or "Start listening" to begin.</span>
-        <div id="studioLog" style="margin-top:10px; max-height:200px; overflow-y:auto; background:var(--bg-panel); border:1px solid var(--border); border-radius:6px; padding:8px; font-family:var(--mono); font-size:10px; color:var(--text-dim);">
-          <i style="color:var(--text-faint)">Run start-devai.bat then click "Start listening" or "Check bridge".</i>
-        </div>
-      </div>
-
-      <div class="card">
-        <h3 style="color:var(--gold-light); margin-top:0;">🧠 What AI can see</h3>
-        <p class="tiny">When you click <b>📂 Send Explorer to AI</b> or <b>📄 Send Selected Script</b> in the plugin, the data appears here and is auto-injected into the next chat message so the AI knows your project structure and existing code. Clear anytime.</p>
-        <div class="btnrow">
-          <button class="btn ghost" id="clearCtx">🗑 Clear AI context</button>
-        </div>
-        <label style="margin-top:8px;display:block;">Explorer / Script context sent from Studio (editable before sending to AI):</label>
-        <textarea id="studioContext" style="height:200px; font-family:var(--mono); font-size:10px;" placeholder="Once you click 'Send Explorer to AI' in the plugin, your project tree will appear here. The AI will see it automatically in chat."></textarea>
-      </div>
-    </section>
-
-    <!-- SETTINGS -->
-    <section class="page" id="page-settings">
-      <h2>⚙ Settings</h2>
-      <p class="subtitle">API keys are stored in your browser (localStorage). They never leave your browser except to the providers below.</p>
-
-      <div class="card">
-        <h3 style="color:var(--gold-light); margin-top:0;">LLM (Chat / Code / GUI)</h3>
-        <label>Provider preset</label>
-        <select id="setPreset">
-          <optgroup label="🆓 100% FREE — No key required (instant)">
-            <option value="https://text.pollinations.ai/openai/v1|openai" selected>⚡ Pollinations AI (default, no signup, no key)</option>
-          </optgroup>
-          <optgroup label="🆓 100% FREE — Coding (best for DevAI scripts, needs free OpenRouter key)">
-            <option value="https://openrouter.ai/api/v1|qwen/qwen3-coder:free">🆓 Qwen3 Coder (best code, 1M ctx)</option>
-            <option value="https://openrouter.ai/api/v1|poolside/laguna-m.1:free">🆓 Poolside Laguna M.1 (agentic coding, 262k)</option>
-            <option value="https://openrouter.ai/api/v1|cohere/north-mini-code:free">🆓 Cohere North Mini Code (terminal/agent coding, 256k)</option>
-            <option value="https://api.groq.com/openai/v1|llama-3.3-70b-versatile">🆓 Groq Llama 3.3 70B (⚡ fastest)</option>
-          </optgroup>
-          <optgroup label="🆓 100% FREE — Reasoning & big context">
-            <option value="https://openrouter.ai/api/v1|nvidia/nemotron-3-ultra-550b-a55b:free">🆓 NVIDIA Nemotron Ultra 550B (550B params, 1M ctx)</option>
-            <option value="https://openrouter.ai/api/v1|deepseek/deepseek-v4-flash:free">🆓 DeepSeek V4 Flash (reasoning, 1M ctx)</option>
-            <option value="https://openrouter.ai/api/v1|meta-llama/llama-3.3-70b-instruct:free">🆓 Llama 3.3 70B (reliable baseline, 131k)</option>
-            <option value="https://openrouter.ai/api/v1|openai/gpt-oss-120b:free">🆓 OpenAI gpt-oss-120b (open-weight, 131k)</option>
-          </optgroup>
-          <optgroup label="🆓 100% FREE — Vision (can read screenshots)">
-            <option value="https://openrouter.ai/api/v1|google/gemma-4-31b-it:free">🆓 Google Gemma 4 31B (vision+text, 262k)</option>
-          </optgroup>
-          <optgroup label="🆓 100% FREE — Utility">
-            <option value="https://openrouter.ai/api/v1|openrouter/free">🆓 OpenRouter Auto (picks any free model)</option>
-            <option value="https://openrouter.ai/api/v1|meta-llama/llama-3.1-8b-instruct:free" selected>🆓 Llama 3.1 8B (lightweight fallback)</option>
-            <option value="http://localhost:11434/v1|llama3.1">🆓 Ollama local (run your own, 100% offline)</option>
-          </optgroup>
-          <optgroup label="💰 Paid / Power user (requires credits)">
-            <option value="https://openrouter.ai/api/v1|openrouter/auto">OpenRouter Auto (paid router)</option>
-            <option value="https://openrouter.ai/api/v1|anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (paid)</option>
-            <option value="https://openrouter.ai/api/v1|openai/gpt-4o-mini">GPT-4o-mini (paid)</option>
-            <option value="https://api.openai.com/v1|gpt-4o-mini">OpenAI direct — GPT-4o-mini (paid)</option>
-            <option value="https://api.moonshot.cn/v1|kimi-k2.7-code">Moonshot Kimi K2.7 Code (paid, $1 min)</option>
-            <option value="https://api.moonshot.cn/v1|kimi-k3">Moonshot Kimi K3 (paid, 1M ctx, $3/$15 MTok)</option>
-          </optgroup>
-          <option value="custom">Custom endpoint…</option>
-        </select>
-        <div id="customLlm" style="display:none; margin-top:10px;">
-          <div class="row">
-            <div style="flex:1;"><label>Base URL</label><input type="text" id="setLlmUrl" placeholder="https://api.example.com/v1"/></div>
-            <div style="flex:1;"><label>Model</label><input type="text" id="setLlmModel" placeholder="model-name"/></div>
-          </div>
-        </div>
-        <label style="margin-top:10px;">API Key <span id="keySavedBadge" class="tiny" style="color:var(--moss);font-weight:700;"></span></label>
-        <input type="password" id="setLlmKey" placeholder="sk-... or sk-or-v1-..."/>
-        <p class="tiny" id="llmKeyHint">Get a free key at <a href="https://openrouter.ai/keys" target="_blank" style="color:var(--amber);">openrouter.ai/keys</a> (choose the free Llama 3.1 model).</p>
-        <p class="tiny" style="color:var(--dim);">💾 Keys are saved in <b>this browser only</b> (localStorage). They never touch any DevAI server. Clear them anytime with the 🗑 button at the bottom of Settings.</p>
-        <div class="btnrow">
-          <button class="btn green" id="testLlm">🔌 Test LLM</button>
-          <button class="btn" id="saveLlm">💾 Save</button>
-          <span id="llmStatus" class="tiny"></span>
-        </div>
-      </div>
-
-      <div class="card">
-        <h3 style="color:var(--gold-light); margin-top:0;">🧊 3D Model Providers — what each is best at</h3>
-        <p class="tiny" style="margin-bottom:10px;">Pick a provider below and paste its key (if required). Then switch to it in the 🧊 3D Models tab.</p>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;">
-          <div style="background:#1a1510;border:1px solid var(--border);border-radius:8px;padding:10px;">
-            <b style="color:var(--moss)">🆓 Hunyuan3D Preview</b>
-            <div style="color:var(--text-dim);margin-top:4px;">Best for: <b>fast visual reference / concept art of what your model will look like</b>. Produces 4-view images (front/side/back/3-4) but NOT a downloadable .glb mesh. No key, unlimited, free.</div>
-            <div class="tiny" style="color:var(--gold);margin-top:4px;">⚡ Speed: ~30s • ✅ No key needed</div>
-          </div>
-          <div style="background:#1a1510;border:1px solid var(--border);border-radius:8px;padding:10px;">
-            <b style="color:var(--amber)">🥇 Meshy</b>
-            <div style="color:var(--text-dim);margin-top:4px;">Best for: <b>real game-ready GLB/FBX meshes you can import directly into Studio</b>. Includes auto-PBR texturing, retopology, rigging, walk/run animations. 100 free credits/month.</div>
-            <div style="margin-top:6px;"><a href="https://www.meshy.ai/settings/api" target="_blank" style="color:var(--amber);font-size:11px">→ Get free key (Google signup, no card)</a></div>
-          </div>
-          <div style="background:#1a1510;border:1px solid var(--border);border-radius:8px;padding:10px;">
-            <b style="color:var(--gold-light)">🥈 Tripo AI</b>
-            <div style="color:var(--text-dim);margin-top:4px;">Best for: <b>very fast low-poly meshes (60-90s)</b>, good for quick props and environment assets. New accounts get limited credits; key you provided has 0 balance.</div>
-            <div style="margin-top:6px;"><a href="https://platform.tripo3d.ai" target="_blank" style="color:var(--gold-light);font-size:11px">→ Top up at platform.tripo3d.ai</a></div>
-          </div>
-          <div style="background:#1a1510;border:1px solid var(--border);border-radius:8px;padding:10px;">
-            <b style="color:var(--text-faint)">🔮 More coming</b>
-            <div style="color:var(--text-dim);margin-top:4px;">Rodin Gen-2.5, CSM, Luma Dream Machine, and Stability 3D will be added as their free tiers stabilize. For now Meshy gives the best free-to-quality ratio.</div>
-          </div>
-        </div>
-        <label style="margin-top:12px;display:block;">Active provider</label>
-        <select id="meshProvider">
-          <option value="hunyuan" selected>🆓 Hunyuan3D 4-view reference (no key, instant)</option>
-          <option value="meshy">🥇 Meshy — real GLB/FBX + rigging (100 free/month)</option>
-          <option value="tripo">🥈 Tripo — fast low-poly (needs credits)</option>
-        </select>
-        <label style="margin-top:10px;display:block;">API Key</label>
-        <input type="password" id="setMeshyKey" placeholder="msy_... for Meshy, or tsk_... for Tripo"/>
-        <div class="btnrow" style="margin-top:8px;">
-          <button class="btn green" id="testMeshy">🔌 Test Key</button>
-          <button class="btn" id="saveMeshy">💾 Save</button>
-          <span id="meshyStatus" class="tiny"></span>
-        </div>
-      </div>
-
-      <div class="card">
-        <h3 style="color:var(--gold-light); margin-top:0;">Project memory</h3>
-        <label>Game name</label><input type="text" id="setGame" placeholder="My Roblox Game"/>
-        <label>Currency</label><input type="text" id="setCurrency" placeholder="Tokens"/>
-        <label>Main UI</label><input type="text" id="setMainUI" placeholder="MainUI"/>
-        <label>Admin system</label><input type="text" id="setAdmin" placeholder="e.g. Cmdr, Adonis, custom"/>
-        <label>Extra instructions (always appended)</label>
-        <textarea id="setExtra" placeholder="Always use CollectionService tags. Prefer typed Luau. Keep remotes in ReplicatedStorage.Remotes."></textarea>
-        <div class="btnrow"><button class="btn" id="saveMemory">💾 Save project memory</button></div>
-      </div>
-
-      <div class="card">
-        <h3 style="color:var(--gold-light); margin-top:0;">Reset</h3>
-        <button class="btn red" id="resetAll">🗑 Clear all saved keys and memory</button>
-      </div>
-    </section>
-
-  </main>
+      <div style="margin-top:20px;text-align:center;color:var(--muted);font-size:11px">DevAI v25 · Lemonade Studio Bridge · Clipboard protocol · No Python required</div>
+    </div></section>
+  </div>
 </div>
-<script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-<script src="app.js?v=22"></script>
+<div class="toast" id="toast"></div>
+<script src="app.js?v=25"></script>
 </body>
 </html>

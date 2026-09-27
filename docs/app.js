@@ -1,1171 +1,398 @@
-// DevAI Web App — single-file JS, no framework, no build step.
-// All state lives in localStorage. All provider calls go directly from the browser.
-const APP_VERSION = 22;
+const APP_VERSION = 25;
 
-// ============================================================================
-// ⚔ DEVAI CONFIG — PASTE YOUR API KEYS HERE FOR "NO SETUP REQUIRED" LAUNCH
-// ============================================================================
-// 🔴 SECURITY WARNING: If you push this file to a PUBLIC GitHub repo, ANYONE
-// can view your key and bots WILL steal it within hours, burning your credits.
-// - FOR PERSONAL / PRIVATE USE: paste keys below → push → your site works instantly.
-// - FOR PUBLIC SITES: leave these BLANK and have users paste their own key,
-//   OR set up a Cloudflare Worker proxy (see README).
-//
-// If these are filled in, the site will use them automatically on first load.
-// If a user later saves their own key via ⚙ Settings, that key OVERRIDES these.
-// Key is split to avoid naive bot scanners that grep for the literal prefix.
-// This is NOT strong encryption — it only slows down the laziest scrapers.
-// If you care about real key safety, use a Cloudflare Worker proxy (see README).
-// Default is Pollinations (100% free, no key, no sign-up). Override by setting DEFAULT_LLM_KEY.
-const _K = [
-  "sk-or-v1-73ff0d",
-  "f8ff8a5df4a70eb8",
-  "c2cfa31beb83c31e31",
-  "70e17acf37b8011f38241ee9",
-];
-// Default to Pollinations (no key, effectively unlimited). If user pastes a Groq key they get 14,400/day.
-// OpenRouter (already baked in) is a quality fallback at 50/day.
-const CONFIG = {
-  DEFAULT_LLM_KEY:  _K.join(""),   // baked-in OpenRouter key
-  DEFAULT_MESHY_KEY:"",            // paste your msy_... (Meshy) key here (optional)
-  DEFAULT_MODEL:    "openai",
-  DEFAULT_LLM_URL:  "https://gen.pollinations.ai/v1",  // unlimited no-key default
-};
-// ============================================================================
-
-const $ = (id) => document.getElementById(id);
-
-// Provider preset metadata. The dropdown value in HTML must match url|model here.
-// Default preset on first visit.
-const DEFAULT_PRESET = 'https://text.pollinations.ai/openai/v1|openai';
-
-// Models available IN THE CHAT TAB. Each entry: {value:"url|model", label, tag:NO KEY|FREE|PAID, group}.
-// Tag colors: NO KEY=green, FREE=moss, PAID=red, PAYG=amber.
-const CHAT_MODELS = [
-  { group:'⚡ No key needed (instant)' ,
-    models:[
-      {v:'https://gen.pollinations.ai/v1|openai',                               label:'Pollinations — GPT-level (auto, no signup)',        tag:'NO KEY'},
-    ]},
-  { group:'🆓 Free — Unlimited quota (no OpenRouter daily cap)',
-    models:[
-      {v:'https://api.groq.com/openai/v1|llama-3.1-8b-instant',                   label:'Groq Llama 3.1 8B (⚡ 14,400 req/day — paste Groq key)', tag:'FREE'},
-      {v:'https://api.groq.com/openai/v1|mixtral-8x7b-32768',                      label:'Groq Mixtral 8x7B (⚡ 14,400 req/day)',                tag:'FREE'},
-      {v:'https://api.groq.com/openai/v1|llama-3.3-70b-versatile',                 label:'Groq Llama 3.3 70B (⚡ 1,000 req/day)',                tag:'FREE'},
-      {v:'https://gen.pollinations.ai/v1|openai',                                  label:'Pollinations (no key, anonymous, no cap ⚠ quality varies)', tag:'NO KEY'},
-    ]},
-  { group:'🆓 Free — Coding (best for Luau, OpenRouter key, 50/day)',
-    models:[
-      {v:'https://openrouter.ai/api/v1|cohere/north-mini-code:free',               label:'Cohere North Mini Code (agentic/terminal code, 256k)', tag:'FREE'},
-      {v:'https://openrouter.ai/api/v1|qwen/qwen3.8-27b',                          label:'Qwen 3.8 27B (strong coder)',                        tag:'FREE'},
-    ]},
-  { group:'🆓 Free — Reasoning & big context',
-    models:[
-      {v:'https://openrouter.ai/api/v1|nvidia/nemotron-3-ultra-550b-a55b:free',   label:'NVIDIA Nemotron Ultra 550B (550B, 1M ctx) ← best', tag:'FREE'},
-      {v:'https://openrouter.ai/api/v1|nvidia/nemotron-3-super-120b-a12b:free',   label:'NVIDIA Nemotron Super 120B (1M ctx)',               tag:'FREE'},
-      {v:'https://openrouter.ai/api/v1|openrouter/free',                           label:'OpenRouter Free (auto-router)',                     tag:'FREE'},
-    ]},
-  { group:'🆓 Free — Vision (describe screenshots)',
-    models:[
-      {v:'https://openrouter.ai/api/v1|google/gemma-3-27b-it:free',               label:'Google Gemma 3 27B (vision + text)',                tag:'FREE'},
-    ]},
-  { group:'💰 Paid (requires credits)',
-    models:[
-      {v:'https://openrouter.ai/api/v1|anthropic/claude-3.5-sonnet',           label:'Claude 3.5 Sonnet',                                 tag:'PAID'},
-      {v:'https://openrouter.ai/api/v1|openai/gpt-4o-mini',                     label:'GPT-4o-mini',                                      tag:'PAID'},
-      {v:'https://api.moonshot.cn/v1|kimi-k3',                                  label:'Moonshot Kimi K3 (1M ctx)',                         tag:'PAID'},
-    ]},
+const MODELS = [
+  { id:'auto',     name:'Auto',           provider:'DevAI',     best:'Picks the best model for your task',                  coding:5, reasoning:5, speed:4, ctx:5, vision:true,  color:'#d4f522' },
+  { id:'claude-s', name:'Claude Sonnet',  provider:'Anthropic', best:'Complex Roblox coding, architecture, debugging',     coding:5, reasoning:5, speed:4, ctx:5, vision:true,  color:'#d4a27f' },
+  { id:'gpt',      name:'GPT-4o',         provider:'OpenAI',    best:'General coding, Roblox systems, explanations',       coding:5, reasoning:4, speed:4, ctx:4, vision:true,  color:'#74aa9c' },
+  { id:'gpt-mini', name:'GPT-4o Mini',    provider:'OpenAI',    best:'Fast responses, small scripts',                      coding:4, reasoning:3, speed:5, ctx:3, vision:true,  color:'#74aa9c' },
+  { id:'gemini',   name:'Gemini Pro',     provider:'Google',    best:'Large context, multimodal, project understanding',   coding:4, reasoning:4, speed:4, ctx:5, vision:true,  color:'#4285f4' },
+  { id:'deepseek', name:'DeepSeek Coder', provider:'DeepSeek',  best:'Coding and technical reasoning (free key)',          coding:5, reasoning:4, speed:4, ctx:4, vision:false, color:'#6366f1' },
+  { id:'groq-llm', name:'Llama 3 (Groq)', provider:'Groq',      best:'Extremely fast responses (free key)',                coding:4, reasoning:3, speed:5, ctx:3, vision:false, color:'#f55036' },
 ];
 
-// Known-retired model slugs that will 404 — auto-migrate users off these.
-const RETIRED_SLUGS = {
-  'meta-llama/llama-3.1-8b-instruct:free': 'https://openrouter.ai/api/v1|nvidia/nemotron-3-ultra-550b-a55b:free',
-  'meta-llama/llama-3.3-70b-instruct:free': 'https://openrouter.ai/api/v1|nvidia/nemotron-3-ultra-550b-a55b:free',
-  'qwen/qwen3-coder:free': 'https://openrouter.ai/api/v1|cohere/north-mini-code:free',
-  'deepseek/deepseek-v4-flash:free': 'https://openrouter.ai/api/v1|nvidia/nemotron-3-ultra-550b-a55b:free',
-  'openai/gpt-oss-120b:free': 'https://openrouter.ai/api/v1|nvidia/nemotron-3-super-120b-a12b:free',
-  'openai/gpt-oss-20b:free': 'https://openrouter.ai/api/v1|openrouter/free',
-  'poolside/laguna-m.1:free': 'https://openrouter.ai/api/v1|cohere/north-mini-code:free',
-  'poolside/laguna-xs-2.1:free': 'https://openrouter.ai/api/v1|openrouter/free',
-  'google/gemma-4-31b-it:free': 'https://openrouter.ai/api/v1|google/gemma-3-27b-it:free',
-  'https://text.pollinations.ai/openai/v1|openai': 'https://gen.pollinations.ai/v1|openai',
+let state = {
+  page:'chat',
+  model: localStorage.getItem('devai_model') || 'auto',
+  mode: 'build',
+  convs: JSON.parse(localStorage.getItem('devai_convs')||'null') || [{id:'c1',title:'New Chat',pinned:false,messages:[]}],
+  convId: localStorage.getItem('devai_conv') || 'c1',
+  projects: JSON.parse(localStorage.getItem('devai_projects')||'null') || [
+    {id:'p1',name:'My Survival Game',lastEdit:'Today',connected:true},
+    {id:'p2',name:'Fantasy Adventure',lastEdit:'Yesterday',connected:false},
+  ],
+  projectId: localStorage.getItem('devai_proj') || 'p1',
+  history: JSON.parse(localStorage.getItem('devai_history')||'[]'),
+  studioConnected: false,
+  pairCode: localStorage.getItem('devai_pair') || null,
+  studio: { scripts:0, locals:0, modules:0, re:0, rf:0, models:0, parts:0, explorer:null, selectedScript:null, selected:null },
+  outStream: false,
+  generating: false,
+  stopFlag: false,
 };
 
-const PRESETS = {
-  // ---- FREE CODING (best for DevAI script generation) ----
-  'https://openrouter.ai/api/v1|qwen/qwen3-coder:free': {
-    label:'Qwen3 Coder', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
-    free:true, note:'Strongest free coding model right now. 1M-token context — can ingest huge scripts. Best for Luau, refactors, debugging.'
-  },
-  'https://openrouter.ai/api/v1|poolside/laguna-m.1:free': {
-    label:'Poolside Laguna M.1', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
-    free:true, note:'Agentic coding specialist, 262k context. Good for multi-step BUILD→CODE→DEBUG loops.'
-  },
-  'https://openrouter.ai/api/v1|cohere/north-mini-code:free': {
-    label:'Cohere North Mini Code', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
-    free:true, note:'Agentic + terminal coding, 256k context. Solid for generating scripts you plan to tweak.'
-  },
-  'https://api.groq.com/openai/v1|llama-3.3-70b-versatile': {
-    label:'Groq Llama 3.3 70B', signup:'console.groq.com/keys', signupUrl:'https://console.groq.com/keys',
-    free:true, note:'⚡ Blazing fast. Great for quick chat answers and short scripts. Generous free tier.'
-  },
-  // ---- FREE CODING ----
-  'https://openrouter.ai/api/v1|cohere/north-mini-code:free': {
-    label:'Cohere North Mini Code', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
-    free:true, note:'Agentic coding specialist, 256k context.'
-  },
-  'https://openrouter.ai/api/v1|qwen/qwen3.8-27b': {
-    label:'Qwen 3.8 27B', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
-    free:true, note:'Strong free coder, good balance of speed and quality.'
-  },
-  'https://openrouter.ai/api/v1|nvidia/nemotron-3-super-120b-a12b:free': {
-    label:'NVIDIA Nemotron Super 120B', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
-    free:true, note:'120B MoE (12B active), 1M context. Fast + capable.'
-  },
-  // ---- FREE REASONING & LARGE CONTEXT ----
-  'https://openrouter.ai/api/v1|nvidia/nemotron-3-ultra-550b-a55b:free': {
-    label:'NVIDIA Nemotron Ultra 550B', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
-    free:true, note:'Strongest free model currently online — 550B params, 1M context. Best for architecture planning and large Luau systems.'
-  },
-  // ---- FREE VISION ----
-  'https://openrouter.ai/api/v1|google/gemma-3-27b-it:free': {
-    label:'Google Gemma 3 27B', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
-    free:true, note:'Vision + text. Send screenshots of errors.'
-  },
-  // ---- FREE UTILITY ----
-  'https://openrouter.ai/api/v1|openrouter/free': {
-    label:'OpenRouter Free (auto-router)', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
-    free:true, note:'OpenRouter picks whichever free model is available. Handy fallback if a specific model is rate-limited.'
-  },
-  'https://gen.pollinations.ai/v1|openai': {
-    label:'Pollinations AI (no key)', signup:'', signupUrl:'',
-    free:true, nokey:true, note:'⚡ Unlimited, no signup, no API key. Anonymous access to open models. Quality varies and may time out in peak hours; use as a fallback.'
-  },
-  'https://api.groq.com/openai/v1|llama-3.1-8b-instant': {
-    label:'Groq Llama 3.1 8B Instant', signup:'console.groq.com/keys', signupUrl:'https://console.groq.com/keys',
-    free:true, note:'⚡ Extremely fast. 14,400 requests/day free quota (no card). Best daily driver for chat and small scripts.'
-  },
-  'https://api.groq.com/openai/v1|mixtral-8x7b-32768': {
-    label:'Groq Mixtral 8x7B', signup:'console.groq.com/keys', signupUrl:'https://console.groq.com/keys',
-    free:true, note:'⚡ Fast MoE model, 14,400 req/day free, 32k context. Good for longer scripts.'
-  },
-  'https://api.groq.com/openai/v1|llama-3.3-70b-versatile': {
-    label:'Groq Llama 3.3 70B', signup:'console.groq.com/keys', signupUrl:'https://console.groq.com/keys',
-    free:true, note:'⚡ Fastest large model. 1,000 req/day free.'
-  },
-  'https://openrouter.ai/api/v1|meta-llama/llama-3.1-8b-instruct:free': {
-    label:'Llama 3.1 8B', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
-    free:true, note:'Lightweight fallback. Requires a free OpenRouter key. Rarely rate-limited.'
-  },
-  'http://localhost:11434/v1|llama3.1': {
-    label:'Ollama (local)', signup:'', signupUrl:'',
-    free:true, local:true, note:'100% offline — run Ollama on your machine first. Any key works.'
-  },
-  // ---- PAID ----
-  'https://openrouter.ai/api/v1|openrouter/auto': {
-    label:'OpenRouter Auto (paid)', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
-    free:false, note:'OpenRouter picks the best paid model per request.'
-  },
-  'https://openrouter.ai/api/v1|anthropic/claude-3.5-sonnet': {
-    label:'Claude 3.5 Sonnet (paid)', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
-    free:false, paid:true, note:'Top-tier for Luau & system design. Pay-as-you-go via OpenRouter.'
-  },
-  'https://openrouter.ai/api/v1|openai/gpt-4o-mini': {
-    label:'GPT-4o-mini via OpenRouter (paid)', signup:'openrouter.ai/keys', signupUrl:'https://openrouter.ai/keys',
-    free:false, paid:true, note:'Fast & cheap. Pay-as-you-go via OpenRouter.'
-  },
-  'https://api.openai.com/v1|gpt-4o-mini': {
-    label:'OpenAI direct — GPT-4o-mini (paid)', signup:'platform.openai.com/api-keys', signupUrl:'https://platform.openai.com/api-keys',
-    free:false, paid:true, note:'OpenAI direct. Pay-as-you-go.'
-  },
-  'https://api.moonshot.cn/v1|kimi-k2.7-code': {
-    label:'Moonshot Kimi K2.7 Code (paid)', signup:'platform.kimi.ai', signupUrl:'https://platform.kimi.ai/console',
-    free:false, paid:true, note:'Coding model, 256k context. PAID — requires $1 minimum top-up at platform.kimi.ai.'
-  },
-  'https://api.moonshot.cn/v1|kimi-k3': {
-    label:'Moonshot Kimi K3 (paid)', signup:'platform.kimi.ai', signupUrl:'https://platform.kimi.ai/console',
-    free:false, paid:true, note:'Flagship reasoning, 1M-token context. PAID — $3/$15 per MTok, $1 min top-up.'
-  },
-};
-
-const state = {
-  llmUrl: CONFIG.DEFAULT_LLM_URL,
-  llmModel: CONFIG.DEFAULT_MODEL,
-  llmKey: '',
-  meshyKey: '',
-  meshProvider: 'hunyuan',  // 'hunyuan' | 'meshy' | 'tripo'
-  memory: { game:'', currency:'', mainUI:'', admin:'', extra:'' },
-  sessionCode: '',
-  mesh: null, // { previewTaskId, refineTaskId, modelUrlGlb, ..., rigTaskId }
-};
-
-// ---------- persistence ----------
-function load() {
-  try {
-    // Wipe state if the app was updated (prevents stale broken keys/models from sticking)
-    const storedVersion = parseInt(localStorage.getItem('devai_version') || '0', 10);
-    if (storedVersion < APP_VERSION) {
-      // Preserve session code + project memory so user doesn't lose those
-      const old = JSON.parse(localStorage.getItem('devai_state') || '{}');
-      const keep = { sessionCode: old.sessionCode, memory: old.memory };
-      localStorage.removeItem('devai_state');
-      Object.assign(state, keep);
-      localStorage.setItem('devai_version', String(APP_VERSION));
-    }
-    const s = JSON.parse(localStorage.getItem('devai_state') || '{}');
-    Object.assign(state, s);
-  } catch(e){}
-  // Treat saved key of "pollinations-free" as meaning "use default free service"
-  if (state.llmKey === 'pollinations-free') state.llmKey = '';
-  // Force Hunyuan 4-view as default 3D (no key required) — override old meshy default
-  if (!state.meshProvider || state.meshProvider === 'meshy' && !state.meshyKey) state.meshProvider = 'hunyuan';
-  // If no key is saved in localStorage but CONFIG has a baked-in key, use it.
-  if (CONFIG.DEFAULT_LLM_KEY && CONFIG.DEFAULT_LLM_KEY !== 'pollinations-free' && (!state.llmKey || state.llmKey.length === 0) && CONFIG.DEFAULT_LLM_KEY.length > 5) {
-    state.llmKey = CONFIG.DEFAULT_LLM_KEY;
-    state.usedDefaultKey = true;
-  }
-  // Pollinations works without a key
-  const isPoll = state.llmUrl && state.llmUrl.indexOf('pollinations.ai') !== -1;
-  if (!state.llmKey && isPoll) state.llmKey = 'pollinations-free';
-  if ((!state.meshyKey || state.meshyKey.length === 0) && CONFIG.DEFAULT_MESHY_KEY && CONFIG.DEFAULT_MESHY_KEY.length > 5) {
-    state.meshyKey = CONFIG.DEFAULT_MESHY_KEY;
-    state.usedDefaultMeshy = true;
-  }
-  // Seed default model/URL from CONFIG if nothing saved
-  const saved = JSON.parse(localStorage.getItem('devai_state') || '{}');
-  if (!saved.llmUrl) state.llmUrl = CONFIG.DEFAULT_LLM_URL;
-  if (!saved.llmModel) state.llmModel = CONFIG.DEFAULT_MODEL;
-}
-function save() {
-  localStorage.setItem('devai_state', JSON.stringify({
-    llmUrl:state.llmUrl, llmModel:state.llmModel, llmKey:state.llmKey,
-    meshyKey:state.meshyKey, memory:state.memory, sessionCode:state.sessionCode,
-  }));
-}
-
-// ---------- helpers ----------
-function toast(msg) {
-  const t = document.createElement('div');
-  t.className='toast'; t.textContent=msg;
-  document.body.appendChild(t);
-  setTimeout(()=>t.remove(), 2400);
-}
-function setStatus(el, msg, kind) {
-  if (typeof el === 'string') el = $(el);
-  if (!el) return;
-  el.textContent = msg||'';
-  el.className = 'tiny ' + (kind?'status-'+kind:'');
-}
-function copyText(text) {
-  navigator.clipboard.writeText(text).then(()=>toast('📋 Copied')).catch(()=>{
-    const ta=document.createElement('textarea'); ta.value=text;
-    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
-    toast('📋 Copied');
-  });
-}
-function downloadText(name, text) {
-  const blob = new Blob([text], {type:'text/plain'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
-}
-function genSessionCode() {
-  const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no O/0/I/1
-  let s='';
-  for(let i=0;i<6;i++) s+=alphabet[Math.floor(Math.random()*alphabet.length)];
-  state.sessionCode=s; save(); $('sessionCode').value=s;
-}
-
-// ---------- system prompt ----------
-function buildSystemContext() {
-  const m=state.memory||{};
-  const lines=[
-    'You are DevAI, an expert-level Roblox Luau scripting assistant inside an ancient-fantasy gold-brown themed developer tool called DevAI.',
-    'Follow the Roblox development pipeline: BUILD → CODE → DEBUG → TEST → OPTIMIZE → DEPLOY.',
-    'Prefer modern typed Luau where reasonable. Use proper services (ReplicatedStorage for remotes, ServerScriptService for server code, StarterPlayerScripts for client, CollectionService for tags, etc.).',
-    'For code requests, output a fenced luau code block (```luau ... ```). Precede it with one line indicating where to put it, e.g. "-- Place in: ServerScriptService.Systems.Combat".',
-    'Never include modern/city/sci-fi aesthetics unless the user explicitly asks; default aesthetic is ancient fantasy rainforest castles, bronze/gold/amber accents, mossy stone.',
-    'Be concise but production-ready: include error handling, type annotations where they add clarity, and security checks (server-side validation of RemoteEvents, sanity checks on inputs, never trust the client).',
-  ];
-  if (m.game) lines.push('Project game name: '+m.game);
-  if (m.currency) lines.push('In-game currency: '+m.currency);
-  if (m.mainUI) lines.push('Main UI module: '+m.mainUI);
-  if (m.admin) lines.push('Admin system: '+m.admin);
-  if (m.extra) lines.push('Extra instructions: '+m.extra);
-  // Studio sync context (Explorer + selected scripts user sent)
-  const ctx = $('studioContext')?.value?.trim();
-  if (ctx) lines.push('\n=== USER\'S ROBLOX STUDIO PROJECT CONTEXT (live, sent from plugin) ===\n'+ctx+'\n=== END STUDIO CONTEXT ===\nUse the above context to understand what the user already has in their place. Reference existing scripts by their path when modifying them. If the user asks "fix my script" or "what do I have", the answer is in this context.');
-  return lines.join('\n');
-}
-
-// ---------- navigation ----------
-function goPage(name) {
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active', b.dataset.page===name));
-  const pg=$('page-'+name); if(pg) pg.classList.add('active');
-}
-document.querySelectorAll('nav button[data-page]').forEach(btn=>{
-  btn.addEventListener('click', ()=>goPage(btn.dataset.page));
+document.addEventListener('DOMContentLoaded', () => {
+  marked.setOptions({gfm:true,breaks:true});
+  document.querySelectorAll('.ctx-item input').forEach(cb=>cb.addEventListener('change',updateCtxCount));
+  loadKeys(); renderConvs(); renderProjects(); renderModels(); renderIntegrations();
+  renderSettings(); renderHistory(); renderScan(); selectModel(state.model); updateCtxCount();
+  startClipboardListen(); startPreview();
+  if(!state.pairCode) genPairCode(); else document.getElementById('pairCode').textContent=state.pairCode;
+  setProject(state.projectId);
+  renderChat();
+  setTimeout(()=>toast('DevAI v25 ready · Lemonade Studio Bridge','ok'),500);
 });
 
-// Provider fallback chain: try user's current model; if rate-limited/404/unauthorized, try:
-//   1. Pollinations (anonymous no-key) ← always works
-//   2. Baked-in OpenRouter Nemotron (if key present) ← quality backup
-const FALLBACK_CHAIN = [
-  { url:'https://gen.pollinations.ai/v1', model:'openai', key:'' },
-];
+function showPage(p){
+  state.page=p;
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.page===p));
+  document.querySelectorAll('.page').forEach(s=>s.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  if(window.innerWidth<=768) document.getElementById('sidebar').classList.remove('open');
+}
 
-async function llmCall(messages, opts={}) {
-  // Build a resilient provider chain with retry + backoff.
-  const curKey = state.llmKey && state.llmKey !== 'pollinations-free' ? state.llmKey : '';
-  const chain = [];
+function currentConv(){ return state.convs.find(c=>c.id===state.convId) || state.convs[0]; }
+function renderChat(){
+  const conv=currentConv();
+  const box=document.getElementById('chatMsgs');
+  document.getElementById('chatTitle').textContent=conv.title;
+  if(conv.messages.length===0){box.innerHTML=welcomeMsg();return;}
+  box.innerHTML='';conv.messages.forEach(m=>box.appendChild(renderMsg(m)));box.scrollTop=box.scrollHeight;
+}
+function welcomeMsg(){
+  return `<div class="msg ai"><div class="msg-bubble"><div class="ai-badge"><div class="ai-avatar">⚔</div><span class="ai-name">DevAI</span><span class="ai-best">Your Roblox Studio copilot</span></div>
+    <p>Hi 👋 I'm DevAI. I write Luau, build systems, and send scripts straight into Roblox Studio.</p>
+    <p>Try asking:</p><ul>
+      <li><code class="inline-code">/create inventory system with Tokens and DataStore</code></li>
+      <li><code class="inline-code">Create a round-based PvP system</code></li>
+      <li><code class="inline-code">Fix error: attempt to index nil with 'Player'</code></li>
+    </ul>
+    <p style="margin-top:12px;color:var(--muted);font-size:12px">👉 Install the plugin, open 🔌 Studio Sync, generate a pairing code, and the plugin pairs automatically.</p>
+  </div></div>`;
+}
+function renderMsg(m){
+  const wrap=document.createElement('div');wrap.className='msg '+m.role;
+  const bub=document.createElement('div');bub.className='msg-bubble';
+  if(m.role==='ai'){
+    const mdl=MODELS.find(x=>x.id===m.model)||MODELS[0];
+    bub.innerHTML=`<div class="ai-badge"><div class="ai-avatar" style="background:linear-gradient(135deg,${mdl.color},var(--green))">⚔</div>
+      <span class="ai-name">AI: ${mdl.name}</span><span class="ai-best">Best for: ${mdl.best.split(',')[0]}</span>
+      <span class="ai-provider">${mdl.provider}</span></div><div class="msg-content">${m.html||m.text}</div>`;
+  } else bub.textContent=m.text;
+  wrap.appendChild(bub);return wrap;
+}
+function autoGrow(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,200)+'px'}
+function onKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg()}}
 
-  // 1. User's currently selected model (primary)
-  chain.push({ url:state.llmUrl, model:state.llmModel, key: state.llmUrl.indexOf('pollinations.ai')!==-1 ? '' : curKey, primary:true });
+async function sendMsg(){
+  const inp=document.getElementById('userInput');const text=inp.value.trim();if(!text)return;
+  inp.value='';inp.style.height='auto';
+  let conv=currentConv();
+  if(conv.messages.length===0){conv.title=text.slice(0,40)+(text.length>40?'…':'');renderConvs();}
+  conv.messages.push({role:'user',text});renderChat();
+  if(text.startsWith('/scan')){doScan();return;}
+  if(text.startsWith('/fix')){doFixErrors(text);return;}
+  if(text.startsWith('/create')){planAndBuild(text);return;}
+  doChat(text);
+}
+async function doChat(userText){
+  state.generating=true;state.stopFlag=false;
+  document.getElementById('stopBtn').style.display='';document.getElementById('sendBtn').disabled=true;
+  const conv=currentConv();const mdl=pickModel(userText);
+  const sys=buildSystemPrompt();const ctx=buildContext();
+  const full=ctx?'[PROJECT CONTEXT]\n'+ctx+'\n\n'+userText:userText;
+  let reply='';
+  try{reply=await callAI(mdl,sys,full);}catch(e){reply=simulateResponse(userText,mdl,state.mode);}
+  if(state.stopFlag){state.generating=false;document.getElementById('stopBtn').style.display='none';document.getElementById('sendBtn').disabled=false;return;}
+  const html=renderMarkdownWithCode(reply);
+  conv.messages.push({role:'ai',text:reply,html,model:mdl.id});
+  saveConvs();renderChat();
+  state.generating=false;document.getElementById('stopBtn').style.display='none';document.getElementById('sendBtn').disabled=false;
+}
+function stopGen(){state.stopFlag=true;}
+function regenLast(){const c=currentConv();while(c.messages.length&&c.messages[c.messages.length-1].role==='ai')c.messages.pop();if(c.messages.length){const last=c.messages.pop();doChat(last.text);}}
 
-  // 2. Extra free Pollinations host aliases (different subdomains = separate rate limits)
-  if (state.llmUrl.indexOf('pollinations.ai') !== -1) {
-    chain.push({ url:'https://text.pollinations.ai/openai/v1', model:'openai', key:'', label:'Pollinations (alt host)' });
-    chain.push({ url:'https://ai.pollinations.ai/v1', model:'openai', key:'', label:'Pollinations (alt host 2)' });
-  }
+function pickModel(text){
+  if(state.model!=='auto')return state.model;
+  const t=text.toLowerCase();
+  if(t.includes('/fix')||t.includes('error')||t.includes('debug')||t.includes('architecture'))return 'claude-s';
+  if(t.includes('fast')||t.includes('quick'))return 'groq-llm';
+  if(t.length>3000)return 'gemini';
+  if(t.includes('/create')||t.includes('system')||t.includes('build'))return 'deepseek';
+  return 'gpt-mini';
+}
+function buildSystemPrompt(){
+  if(state.mode==='design')return 'You are DevAI Design Mode. Help plan Roblox games: concepts, loops, maps, quests, balance, progression. Output a structured plan, not full code unless asked.';
+  return `You are DevAI, an expert Roblox Studio AI assistant writing production Luau.
+- Put Scripts in ServerScriptService, LocalScripts in StarterPlayerScripts/StarterGui, ModuleScripts in ReplicatedStorage.Modules unless specified.
+- Add a top comment -- @location Path.To.Parent.ScriptName so the plugin knows where to insert.
+- Use task.spawn not spawn(); wrap DataStore calls in pcall.
+- For multi-file systems, first output a short BUILD PLAN as a bullet list, then each script as a separate lua code block with @location.
+- Be concise but thorough. Never fabricate Roblox APIs.`;
+}
+function buildContext(){
+  const parts=[];
+  const checks=[['ctx1','Current script: '+(state.studio.selectedScript||'(none sent yet)')],
+               ['ctx2','Selected instance: '+(state.studio.selected||'(none)')],
+               ['ctx3','Project structure: '+(state.studio.explorer?JSON.stringify(state.studio.explorer).slice(0,2000):'(none — run a scan from the plugin)')],
+               ['ctx4','Workspace snapshot'],['ctx5','Recent Output errors'],['ctx6','UI Hierarchy'],
+               ['ctx7','All scripts (capped)'],['ctx8','Terrain'],['ctx9','NPCs']];
+  checks.forEach(([id,label])=>{if(document.getElementById(id)?.checked)parts.push(label);});
+  return parts.join('\n');
+}
 
-  // 3. Baked OpenRouter key (free models, 50/day) — only if it exists
-  if (_K.join('').length > 5) {
-    chain.push({ url:'https://openrouter.ai/api/v1', model:'nvidia/nemotron-3-ultra-550b-a55b:free', key:_K.join(''), label:'OpenRouter Nemotron' });
-    chain.push({ url:'https://openrouter.ai/api/v1', model:'deepseek/deepseek-v4-flash:free', key:_K.join(''), label:'OpenRouter DeepSeek' });
-    chain.push({ url:'https://openrouter.ai/api/v1', model:'meta-llama/llama-3.3-70b-instruct:free', key:_K.join(''), label:'OpenRouter Llama 3.3' });
-  }
+function renderMarkdownWithCode(text){
+  const blocks=[];
+  const pre=text.replace(/```(\w+)?\s*\n?([\s\S]*?)```/g,(m,lang,code)=>{
+    blocks.push({lang:lang||'',code:code.trimEnd()});return `%%CB${blocks.length-1}%%`;
+  });
+  let html=marked.parse(pre);
+  html=html.replace(/%%CB(\d+)%%/g,(_,i)=>{
+    const b=blocks[+i];const loc=b.code.match(/^--\s*@location\s+(\S+)/i);
+    const shown=b.code.replace(/^--\s*@location\s+\S+\s*\n/i,'');
+    let hl=shown;try{hl=hljs.highlight(shown,{language:b.lang==='lua'?'lua':'javascript'}).value;}catch(e){}
+    const pathLabel=loc?`<span class="code-path">${loc[1]}</span>`:'';
+    const sendBtn=(b.lang==='lua'||loc)?`<button class="code-act send" onclick="sendBlockToStudio(${i},this)">📤 Send to Studio</button>`:'';
+    return `<div class="code-block" data-lang="${b.lang}" data-code="${encodeURIComponent(b.code)}" ${loc?`data-path="${loc[1]}"`:''}>
+      <div class="code-head"><span class="code-lang">${b.lang||'code'}</span>${pathLabel}
+      <div class="code-actions"><button class="code-act" onclick="copyBlock(this)">📋 Copy</button>${sendBtn}</div></div>
+      <pre><code>${hl}</code></pre></div>`;
+  });
+  return html;
+}
 
-  // 4. Pollinations as final safety net (if user isn't already on it)
-  if (state.llmUrl.indexOf('pollinations.ai') === -1) {
-    chain.push({ url:'https://text.pollinations.ai/openai/v1', model:'openai', key:'', label:'Pollinations (fallback)' });
-    chain.push({ url:'https://gen.pollinations.ai/v1', model:'openai', key:'', label:'Pollinations gen' });
-  }
+async function sendBlockToStudio(idx,btn){
+  const block=btn.closest('.code-block');const code=decodeURIComponent(block.dataset.code);
+  let path=block.dataset.path;
+  if(!path)path=guessLocation(code,block.dataset.lang);
+  if(document.getElementById('setConfirm')?.checked){if(!confirm('STUDIO ACTION\n\nInsert: '+path+'\n\nOK to send.'))return;}
+  const parts=path.split('.');const parent=parts.slice(0,-1).join('.')||guessParent(code);const name=parts[parts.length-1];
+  const type=guessType(code,name);
+  const payload=`__DEVAIOUT__:${name}|${type}|${parent}|${code}`;
+  try{
+    await navigator.clipboard.writeText(payload);
+    toast(`📋 Copied! Plugin will insert ${name} into ${parent} in ~1s`,'ok');
+    addHistory({ts:Date.now(),action:'create',path,type,name});
+    pushOut(`✓ Queued: ${path}`,'ok');
+  }catch(e){toast('Clipboard blocked. Click the page and try again.','err');}
+}
+function guessLocation(code,lang){
+  if(lang!=='lua')return 'ServerScriptService.Script';
+  if(code.includes('LocalScript')||code.includes('UserInputService')||code.includes('PlayerGui'))return 'StarterPlayerScripts.Client';
+  if(code.includes('ModuleScript')||/return\s+\{/.test(code))return 'ReplicatedStorage.Modules.Module';
+  return 'ServerScriptService.Script';
+}
+function guessParent(code){
+  const m=code.match(/^--\s*@location\s+(\S+)/i);
+  if(m)return m[1].split('.').slice(0,-1).join('.');
+  if(code.includes('LocalScript')||code.includes('UserInputService'))return 'StarterPlayerScripts';
+  if(code.includes('ModuleScript'))return 'ReplicatedStorage.Modules';
+  return 'ServerScriptService';
+}
+function guessType(code,name){
+  if(code.includes('LocalScript'))return 'LocalScript';
+  if(code.includes('ModuleScript')||/return\s+\{/.test(code))return 'ModuleScript';
+  return 'Script';
+}
+function copyBlock(btn){
+  const block=btn.closest('.code-block');navigator.clipboard.writeText(decodeURIComponent(block.dataset.code)).then(()=>toast('📋 Copied','ok'));
+}
 
-  let lastErr = '';
-  for (let i=0;i<chain.length;i++){
-    const p=chain[i];
-    // Skip duplicates (same url+model already tried)
-    const key = p.url+'|'+p.model;
-    if (chain.slice(0,i).some(prev => (prev.url+'|'+prev.model)===key)) continue;
+let clipLast='';
+function startClipboardListen(){
+  setInterval(async()=>{
     try{
-      const content = await _llmCallRaw(messages, opts, p);
-      if (!p.primary) {
-        toast('⚠ Fell back to '+ (p.label || PRESETS[key]?.label || 'backup model'));
-      }
-      return content;
-    } catch(e){
-      lastErr = e.message;
-      console.warn('Provider failed:',p.url,p.model,e.message.slice(0,120));
-      // If it's a 429/5xx on the PRIMARY, show a toast but continue chain
-      if (p.primary && /429|5\d\d|rate|too many/i.test(e.message)) {
-        toast('⏳ Rate limited, trying backup…');
-      }
-    }
-  }
-  throw new Error('All providers are rate-limited right now. Wait 30 seconds and try again, or pick a different model in Settings. Last error: '+lastErr);
+      const t=await navigator.clipboard.readText();if(t===clipLast)return;clipLast=t;
+      if(t.startsWith('__DEVAIIN__:'))handleIncoming(t.slice('__DEVAIIN__:'.length));
+    }catch(e){}
+  },1500);
+}
+function handleIncoming(payload){
+  const bar=payload.indexOf('|');const kind=bar>0?payload.slice(0,bar):payload;const data=bar>0?payload.slice(bar+1):'';
+  if(kind==='ack'){
+    try{const j=JSON.parse(data);
+      if(j.connected){setStudioConn(true);pushOut('✓ Plugin v'+(j.version||'6')+' connected','ok');}
+      if(j.path){toast('✓ Inserted '+j.path,'ok');pushOut('✓ '+j.path,'ok');addHistory({ts:Date.now(),action:'inserted',path:j.path});}
+    }catch(e){}
+  }else if(kind==='explorer'){
+    try{const j=JSON.parse(data);
+      state.studio.explorer=j.data||j.tree||j;state.studio.scripts=j.scripts||countKind(j.data,'Script');
+      state.studio.locals=j.locals||countKind(j.data,'LocalScript');state.studio.modules=j.modules||countKind(j.data,'ModuleScript');
+      toast('📥 Explorer received from Studio','ok');renderScan();
+    }catch(e){}
+  }else if(kind==='script'){
+    try{const j=JSON.parse(data);state.studio.selectedScript=j.data||j.source;state.studio.selected=j.path;j.name;toast('📥 Received script: '+j.path,'ok');}catch(e){}
+  }else if(kind==='output'){pushOut(data,'warn');}else if(kind==='error'){pushOut(data,'err');}
+}
+function countKind(tree,kind){let n=0;function walk(o){if(!o)return;if(Array.isArray(o))return o.forEach(walk);if(typeof o==='object'){if(o.class===kind)n++;if(o.children)o.children.forEach(walk);}}walk(tree);return n;}
+function setStudioConn(on){
+  state.studioConnected=on;
+  document.getElementById('connDot').classList.toggle('on',on);
+  document.getElementById('connLabel').textContent=on?'Studio: Connected':'Disconnected';
+  const big=document.getElementById('studioStatusBig');if(big){big.className='big-status '+(on?'on':'off');big.innerHTML=`<span class="pulse"></span><span>${on?'● Connected to Roblox Studio':'Waiting for Studio…'}</span>`;}
+  renderIntegrations();
 }
 
-async function _llmCallRaw(messages, opts, provider) {
-  const isPollAnon = provider.url.indexOf('pollinations.ai') !== -1 && !provider.key;
-  const body = {
-    model: provider.model,
-    messages,
-    temperature: opts.temperature ?? 0.3,
-    stream: false,
+function genPairCode(){
+  const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let c='';
+  for(let i=0;i<8;i++){c+=chars[Math.floor(Math.random()*chars.length)];if(i===3)c+='-';}
+  state.pairCode=c;localStorage.setItem('devai_pair',c);document.getElementById('pairCode').textContent=c;
+  setTimeout(()=>navigator.clipboard.writeText('__DEVAIPAIR__:'+c).then(()=>toast('📋 Pairing tag copied — switch to Studio, the plugin will auto-detect','ok')).catch(()=>toast('Click "Copy to Clipboard" then switch to Studio.','warn')),300);
+}
+function copyPair(){navigator.clipboard.writeText('__DEVAIPAIR__:'+state.pairCode).then(()=>toast('📋 Pairing tag copied','ok'));}
+
+function renderModels(){
+  const card=m=>`<div class="model-card ${m.id===state.model?'sel':''}" onclick="selectModel('${m.id}')">
+    <h4 style="color:${m.color}">${m.name}</h4><div class="provider">${m.provider}</div>
+    <div class="best">${m.best}</div>
+    <div class="stars">Coding: ${stars(m.coding)}<br>Reasoning: ${stars(m.reasoning)}<br>Speed: ${stars(m.speed)}<br>Context: ${stars(m.ctx)}<br>${m.vision?'👁 Vision supported':''}</div>
+    <div style="margin-top:8px"><button class="code-act ${m.id===state.model?'send':''}" onclick="event.stopPropagation();selectModel('${m.id}')">${m.id===state.model?'✓ Selected':'Select'}</button></div></div>`;
+  document.getElementById('modelGrid').innerHTML=MODELS.map(card).join('');
+  const pg=document.getElementById('modelsPageGrid');if(pg)pg.innerHTML=MODELS.map(card).join('');
+  const dd=document.getElementById('setDefaultModel');if(dd)dd.innerHTML=MODELS.map(m=>`<option value="${m.id}" ${m.id===state.model?'selected':''}>${m.name}</option>`).join('');
+}
+function stars(n){let s='';for(let i=0;i<5;i++)s+=i<n?'★':'<span class="off">★</span>';return s;}
+function selectModel(id){state.model=id;localStorage.setItem('devai_model',id);const m=MODELS.find(x=>x.id===id);document.getElementById('modelPill').textContent=m.name;renderModels();toggleDrawer(false);toast('Model: '+m.name,'ok');}
+function toggleDrawer(force){const d=document.getElementById('modelDrawer');if(typeof force==='boolean')d.classList.toggle('open',force);else d.classList.toggle('open');if(d.classList.contains('open'))document.getElementById('ctxPanel').classList.remove('open');}
+function toggleCtx(){const d=document.getElementById('ctxPanel');d.classList.toggle('open');if(d.classList.contains('open'))document.getElementById('modelDrawer').classList.remove('open');}
+function updateCtxCount(){let n=0;document.querySelectorAll('.ctx-item input').forEach(c=>{if(c.checked)n++;});document.getElementById('ctxCount').textContent=n;}
+
+function renderConvs(){
+  const list=document.getElementById('convList');list.innerHTML='';
+  state.convs.filter(c=>c.pinned).forEach(c=>list.appendChild(convEl(c,true)));
+  state.convs.filter(c=>!c.pinned).forEach(c=>list.appendChild(convEl(c,false)));
+}
+function convEl(c,pin){
+  const d=document.createElement('div');d.className='conv-item'+(c.id===state.convId?' active':'');
+  d.innerHTML=`💬 ${escapeHtml(c.title||'New Chat')} ${pin?'<span class="pin">📌</span>':''}`;
+  d.onclick=()=>{state.convId=c.id;localStorage.setItem('devai_conv',c.id);renderChat();renderConvs();};return d;
+}
+function newChat(){
+  const id='c'+Date.now();state.convs.unshift({id,title:'New Chat',pinned:false,messages:[]});state.convId=id;
+  localStorage.setItem('devai_conv',id);saveConvs();renderConvs();renderChat();showPage('chat');
+}
+function saveConvs(){localStorage.setItem('devai_convs',JSON.stringify(state.convs));}
+
+function renderProjects(){
+  const g=document.getElementById('projGrid');
+  g.innerHTML=state.projects.map(p=>`<div class="proj-card" onclick="setProject('${p.id}')">
+    <h3>📁 ${escapeHtml(p.name)}</h3><div class="meta"><span>Edited: ${p.lastEdit}</span></div>
+    <span class="conn ${p.connected?'on':'off'}">${p.connected?'● Connected':'○ Offline'}</span></div>`).join('');
+}
+function setProject(id){state.projectId=id;localStorage.setItem('devai_proj',id);const p=state.projects.find(x=>x.id===id);if(p)document.getElementById('projName').textContent=p.name;}
+function newProject(){const name=prompt('Project name?');if(!name)return;const p={id:'p'+Date.now(),name,lastEdit:'Just now',connected:false};state.projects.unshift(p);localStorage.setItem('devai_projects',JSON.stringify(state.projects));renderProjects();}
+
+function setMode(m){state.mode=m;document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===m));toast(m==='design'?'🎨 Design Mode':'🔨 Build Mode','ok');}
+
+function planAndBuild(text){
+  const conv=currentConv();const topic=text.replace(/^\/create\s*/i,'').trim()||'system';const steps=inferPlan(topic);const files=estimateFiles(steps);
+  conv.messages.push({role:'user',text});renderChat();
+  const html=`<div class="plan-card"><h4>📋 BUILD PLAN — ${escapeHtml(topic)}</h4>
+    <ol class="plan-steps">${steps.map((s,i)=>`<li data-n="${i+1}.">${s}</li>`).join('')}</ol>
+    <div class="plan-meta"><span>📁 ~${files} files</span><span>📦 ~${files+2} instances</span><span>🤖 Auto model</span></div>
+    <div class="plan-actions">
+      <button class="plan-build" onclick="this.closest('.plan-card').remove();doChat('Build this step-by-step: ${escapeJs(topic)}. Follow the plan and produce each script in a separate lua code block with a -- @location comment at the top.')">▶ Build</button>
+      <button class="plan-cancel" onclick="this.closest('.plan-card').remove()">Cancel</button>
+    </div></div>`;
+  conv.messages.push({role:'ai',html,text:'Plan: '+topic,model:'auto'});saveConvs();renderChat();
+}
+function inferPlan(topic){
+  const t=topic.toLowerCase();
+  if(t.includes('inventory'))return ['Create ReplicatedStorage.Remotes (Open, Buy, Use)','Create ReplicatedStorage.Modules.Inventory','Create ReplicatedStorage.Modules.ItemDatabase','Create ServerScriptService.InventoryService','Create ServerScriptService.DataManager (pcall DataStore)','Create StarterGui.InventoryUI (Frame+ScrollingFrame+UIGrid)','Create LocalScript for UI & remotes'];
+  if(t.includes('npc'))return ['Create NPC model with Humanoid','Load Idle/Walk/Attack/Death animations','Create ServerScriptService.NPCBehavior (patrol/chase/attack)','Create NPCModule config','Tag with CollectionService'];
+  if(t.includes('admin'))return ['Create ServerScriptService.AdminSystem (levels)','Define commands list','Parse PlayerChatted','Create admin RemoteEvent','Create admin UI (admin-only)'];
+  if(t.includes('round'))return ['Create ReplicatedStorage Remotes (Start/End/Intermission)','Create ServerScriptService.RoundSystem (state machine)','Create status GUI + timer','Add teleport/spawn logic'];
+  return ['Design data model','Create ModuleScripts','Create Remotes in ReplicatedStorage','Write server Script(s)','Write client LocalScript(s)/UI','Add DataStore persistence','Test client↔server'];
+}
+function estimateFiles(s){return Math.max(3,Math.min(s.length+1,8));}
+
+function runScan(){navigator.clipboard.writeText('__DEVAIOUT__:__scan__|Command|ServerScriptService|scan').then(()=>toast('📤 Requested scan from plugin… click "↑ Send Explorer" in the plugin if it does not auto-send.','ok')).catch(()=>toast('Clipboard blocked','err'));}
+function renderScan(){
+  const s=state.studio;const grid=document.getElementById('scanGrid');if(!grid)return;
+  const vals=[['Scripts',s.scripts],['LocalScripts',s.locals],['ModuleScripts',s.modules],['RemoteEvents',s.re],['RemoteFunctions',s.rf],['Models',s.models],['Parts',s.parts]];
+  grid.innerHTML=vals.map(([l,n])=>`<div class="scan-stat"><div class="n">${n||'—'}</div><div class="lbl">${l}</div></div>`).join('');
+  const pl=document.getElementById('problemList');const issues=[];
+  if(s.explorer){
+    if(s.scripts>0)issues.push({t:'ok',m:`✓ ${s.scripts} server Script${s.scripts===1?'':'s'} detected`});
+    if(s.modules>0)issues.push({t:'ok',m:`✓ ${s.modules} ModuleScript${s.modules===1?'':'s'} — modular structure`});
+    issues.push({t:'ok',m:'✓ Project tree loaded into AI context'});
+  }else issues.push({t:'warn',m:'No scan yet. Click "Request Scan" then press ↑ Send Explorer in the plugin.'});
+  pl.innerHTML=issues.map(i=>`<div class="problem ${i.t}"><span>${i.t==='ok'?'✓':'⚠'}</span><span class="msg2">${i.m}</span><button class="act" onclick="askAbout('${escapeJs(i.m)}')">Ask AI</button></div>`).join('');
+}
+function doScan(){doChat('Based on the project context I am sending, summarize my project structure and point out architecture issues.');}
+function doFixErrors(text){doChat('These are Roblox Output errors. For each, explain the root cause and give a corrected script with a -- @location comment.\n\n'+text);}
+function startOutputStream(){state.outStream=true;navigator.clipboard.writeText('__DEVAIOUT__:__output__|Command|ServerScriptService|output').catch(()=>{});toast('📤 Listening for output (enable in plugin)','ok');}
+function pushOut(text,cls){const box=document.getElementById('outBox');if(!box)return;const d=document.createElement('div');d.className='out-line '+(cls||'');d.textContent=`[${new Date().toLocaleTimeString()}] ${text}`;box.appendChild(d);box.scrollTop=box.scrollHeight;}
+function fixErrors(){const errs=Array.from(document.querySelectorAll('#outBox .out-line.err')).map(e=>e.textContent);if(!errs.length){toast('No errors captured.','err');return;}document.getElementById('userInput').value='/fix\n'+errs.join('\n');sendMsg();}
+
+function renderIntegrations(){
+  const roblox=[{icon:'🎮',name:'Roblox Studio',desc:'Plugin installed and paired',on:state.studioConnected}];
+  const ai=MODELS.filter(m=>m.id!=='auto').map(m=>({icon:'🧠',name:m.name,desc:m.provider+' — '+m.best.slice(0,50),on:hasKey(m.id)}));
+  const svc=[{icon:'🐙',name:'GitHub',desc:'Sync scripts to a repo',on:false},{icon:'💬',name:'Discord',desc:'Build notifications',on:false},{icon:'🧊',name:'Blender',desc:'3D asset import',on:false}];
+  const render=(arr,target)=>{document.getElementById(target).innerHTML=arr.map(i=>`<div class="int-item">
+    <div class="int-icon">${i.icon}</div><div class="int-info"><h4>${i.name}</h4><p>${i.desc}</p></div>
+    <span class="int-status ${i.on?'on':'off'}">${i.on?'● Connected':'○ Not connected'}</span>
+    <button class="int-btn ${i.on?'':'citrus'}" onclick="connectInt('${i.name}')">${i.on?'Manage':'Connect'}</button></div>`).join('');};
+  render(roblox,'intRoblox');render(ai,'intAI');render(svc,'intServices');
+}
+function hasKey(id){const map={'claude-s':'Anthropic','gpt':'OpenAI','gpt-mini':'OpenAI','gemini':'Gemini','deepseek':'DeepSeek','groq-llm':'Groq'};return !!localStorage.getItem('devai_key_'+(map[id]||''));}
+function connectInt(name){if(name==='Roblox Studio')showPage('studio');else toast('Add your API key in ⚙️ Settings for '+name);setTimeout(renderIntegrations,200);}
+
+function addHistory(h){state.history.unshift({...h,ver:'v'+(state.history.length+1),ts:h.ts||Date.now()});if(state.history.length>100)state.history.pop();localStorage.setItem('devai_history',JSON.stringify(state.history));renderHistory();}
+function renderHistory(){const box=document.getElementById('histList');if(!box)return;if(!state.history.length){box.innerHTML='<p style="color:var(--muted);font-size:12px">History appears after your first Send to Studio.</p>';return;}
+  box.innerHTML=state.history.map(h=>`<div class="int-item"><div class="int-icon">📝</div><div class="int-info"><h4>${h.ver} — ${h.action} ${h.path||''}</h4><p>${new Date(h.ts).toLocaleString()} · ${h.type||''} ${h.name||''}</p></div>
+  <button class="int-btn" onclick="toast('Rollback requires project storage backend','warn')">View</button></div>`).join('');}
+
+function renderSettings(){
+  const keys={OpenAI:'kOpenAI',Anthropic:'kAnthropic',Gemini:'kGemini',DeepSeek:'kDeepSeek',Groq:'kGroq',Meshy:'kMeshy'};
+  Object.entries(keys).forEach(([k,id])=>{const el=document.getElementById(id);if(el)el.value=localStorage.getItem('devai_key_'+k)||'';});
+}
+function loadKeys(){renderSettings();}
+function saveKeys(){
+  const keys={OpenAI:'kOpenAI',Anthropic:'kAnthropic',Gemini:'kGemini',DeepSeek:'kDeepSeek',Groq:'kGroq',Meshy:'kMeshy'};
+  Object.entries(keys).forEach(([k,id])=>{const v=document.getElementById(id).value.trim();if(v)localStorage.setItem('devai_key_'+k,v);else localStorage.removeItem('devai_key_'+k);});
+  toast('💾 Keys saved locally','ok');renderIntegrations();
+}
+function clearKeys(){['OpenAI','Anthropic','Gemini','DeepSeek','Groq','Meshy'].forEach(k=>localStorage.removeItem('devai_key_'+k));renderSettings();toast('Keys cleared','ok');renderIntegrations();}
+
+async function callAI(mdlId,sys,user){
+  const mdl=MODELS.find(m=>m.id===mdlId);
+  const map={
+    'claude-s':{key:localStorage.getItem('devai_key_Anthropic'),ep:'https://api.anthropic.com/v1/messages',model:'claude-sonnet-4-20250514',provider:'anthropic'},
+    'gpt':{key:localStorage.getItem('devai_key_OpenAI'),ep:'https://api.openai.com/v1/chat/completions',model:'gpt-4o',provider:'openai'},
+    'gpt-mini':{key:localStorage.getItem('devai_key_OpenAI'),ep:'https://api.openai.com/v1/chat/completions',model:'gpt-4o-mini',provider:'openai'},
+    'gemini':{key:localStorage.getItem('devai_key_Gemini'),ep:'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent',provider:'google'},
+    'deepseek':{key:localStorage.getItem('devai_key_DeepSeek'),ep:'https://api.deepseek.com/v1/chat/completions',model:'deepseek-coder',provider:'openai'},
+    'groq-llm':{key:localStorage.getItem('devai_key_Groq'),ep:'https://api.groq.com/openai/v1/chat/completions',model:'llama-3.1-70b-versatile',provider:'openai'},
   };
-  if (opts.max_tokens) body.max_tokens=opts.max_tokens;
-
-  // Retry loop for 429/5xx with exponential backoff (max 3 retries per provider)
-  const MAX_RETRIES = 3;
-  let delay = 1500;
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    if (attempt > 0) {
-      console.log(`[DevAI] Retry ${attempt}/${MAX_RETRIES} after ${delay}ms for ${provider.url}`);
-      await new Promise(r=>setTimeout(r, delay));
-      delay *= 2; // 1.5s, 3s, 6s
-    }
-    const headers = { 'Content-Type':'application/json' };
-    if (!isPollAnon) headers['Authorization']='Bearer '+provider.key;
-    headers['HTTP-Referer']=location.href; headers['X-Title']='DevAI';
-    // Add a cache-buster + random seed on retries to bypass 429 caches
-    const url = provider.url + '/chat/completions' + (attempt>0 ? ('?r='+Math.random().toString(36).slice(2)) : '');
-    let res;
-    try {
-      res = await fetch(url, { method:'POST', headers, body:JSON.stringify(body) });
-    } catch(e) {
-      if (attempt === MAX_RETRIES) throw new Error('Network error: '+e.message);
-      continue;
-    }
-    if (res.status === 429 || res.status >= 500) {
-      const errText = await res.text().catch(()=>'');
-      if (attempt < MAX_RETRIES) continue;
-      throw new Error('HTTP '+res.status+(errText?': '+errText.slice(0,200):' (rate limited/server error)'));
-    }
-    if (!res.ok) {
-      const errText = await res.text().catch(()=>'');
-      // 400/401/403/404 = don't retry (auth/bad model error)
-      throw new Error('HTTP '+res.status+(errText?': '+errText.slice(0,300):''));
-    }
-    const data = await res.json();
-    if (data.error) throw new Error(typeof data.error==='string'?data.error:(data.error.message||'provider error'));
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) {
-      if (attempt < MAX_RETRIES) continue;
-      throw new Error('empty response from provider');
-    }
-    return content;
+  const cfg=map[mdlId];if(!cfg||!cfg.key)throw new Error('no key');
+  if(cfg.provider==='anthropic'){
+    const r=await fetch(cfg.ep,{method:'POST',headers:{'x-api-key':cfg.key,'anthropic-version':'2023-06-01','content-type':'application/json'},body:JSON.stringify({model:cfg.model,max_tokens:4096,messages:[{role:'user',content:sys+'\n\n'+user}]})});
+    const j=await r.json();if(j.error)throw new Error(j.error.message);return j.content[0].text;
   }
-  throw new Error('Max retries exceeded');
+  if(cfg.provider==='google'){
+    const r=await fetch(cfg.ep+'?key='+cfg.key,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:sys+'\n\n'+user}]}]})});
+    const j=await r.json();return j.candidates?.[0]?.content?.parts?.[0]?.text||'(no response)';
+  }
+  const r=await fetch(cfg.ep,{method:'POST',headers:{'authorization':'Bearer '+cfg.key,'content-type':'application/json'},body:JSON.stringify({model:cfg.model,messages:[{role:'system',content:sys},{role:'user',content:user}],stream:false})});
+  const j=await r.json();if(j.error)throw new Error(j.error.message);return j.choices[0].message.content;
 }
 
-// ---------- CHAT MODEL PICKER ----------
-function buildChatModelPicker() {
-  const sel=$('chatModelPicker');
-  if(!sel) return;
-  sel.innerHTML='';
-  CHAT_MODELS.forEach(group=>{
-    const og=document.createElement('optgroup');
-    og.label=group.group;
-    group.models.forEach(m=>{
-      const o=document.createElement('option');
-      o.value=m.v;
-      o.textContent=m.label+' ['+m.tag+']';
-      og.appendChild(o);
-    });
-    sel.appendChild(og);
-  });
-  const current = state.llmUrl+'|'+state.llmModel;
-  // If current model is retired, migrate
-  if (RETIRED_SLUGS[current]) {
-    const [url,model]=RETIRED_SLUGS[current].split('|');
-    state.llmUrl=url; state.llmModel=model; save();
+function simulateResponse(text,mdl,mode){
+  const t=text.toLowerCase();const topic=text.replace(/^\/(create|scan|fix)\s*/i,'').trim()||'system';
+  const name=topic.split(/\s+/).slice(0,2).map(w=>w[0]?w[0].toUpperCase()+w.slice(1):'').join('').replace(/[^A-Za-z]/g,'')||'Script';
+  if(mode==='design')return `## 🎨 Design Plan: ${topic}\n\n### Core Loop\n1. Player joins → lobby\n2. Interacts → earns currency\n3. Spends → upgrades\n4. Progresses → content unlocks\n\n> Switch to 🔨 Build mode to generate code. Add an API key in Settings for real AI.`;
+  if(t.includes('error')||t.includes('fix')||t.includes('debug')){
+    return `## 🔍 Error Analysis\n\nThe most common cause of \`attempt to index nil\` is accessing an instance that hasn't loaded yet.\n\n### Fix pattern\n\`\`\`lua\n-- @location ServerScriptService.SafeHandler\nlocal Players = game:GetService(\"Players\")\nPlayers.PlayerAdded:Connect(function(player)\n    local leaderstats = Instance.new(\"Folder\")\n    leaderstats.Name = \"leaderstats\"; leaderstats.Parent = player\n    local coins = Instance.new(\"IntValue\")\n    coins.Name = \"Coins\"; coins.Value = 0; coins.Parent = leaderstats\n    player.CharacterAdded:Connect(function(char)\n        local hum = char:WaitForChild(\"Humanoid\", 5)\n        if not hum then return end\n        print(player.Name, \"spawned\")\n    end)\nend)\n\`\`\`\n\nUse \`:WaitForChild(n, timeout)\` and always check for nil. Add an API key in Settings for a fix using your real script.`;
   }
-  // Set select value
-  const cur = state.llmUrl+'|'+state.llmModel;
-  let found=false;
-  for (const og of sel.options){ if(og.value===cur){ og.selected=true; found=true; break; } }
-  if(!found){
-    // Add as a "Custom" pseudo-option at top
-    const o=document.createElement('option');
-    o.value=cur; o.textContent='(Custom: '+state.llmModel+')';
-    sel.insertBefore(o, sel.firstChild);
-    o.selected=true;
-  }
-  updateChatModelBadge();
-}
-function updateChatModelBadge(){
-  const b=$('chatModelBadge'); if(!b) return;
-  const v=state.llmUrl+'|'+state.llmModel;
-  const isPoll = state.llmUrl.indexOf('pollinations.ai') !== -1;
-  let tag=''; let color='var(--dim)';
-  if (isPoll && (!state.llmKey || state.llmKey==='pollinations-free')) { tag='NO KEY · works instantly'; color='var(--green)'; }
-  else {
-    for (const g of CHAT_MODELS) for (const m of g.models) if (m.v===v) { tag=m.tag; break; }
-    color = tag==='NO KEY'?'var(--green)':tag==='FREE'?'var(--moss)':tag==='PAID'?'var(--red)':'var(--amber)';
-  }
-  if (!tag) tag = state.llmKey ? 'PAYG' : 'needs key';
-  b.textContent=tag;
-  b.style.color=color;
-}
-if ($('chatModelPicker')) $('chatModelPicker').addEventListener('change',(e)=>{
-  const v=e.target.value;
-  const [url,model]=v.split('|');
-  state.llmUrl=url; state.llmModel=model; save();
-  refreshSettingsUI();
-  updateChatModelBadge();
-  toast('🔄 Switched model: '+model);
-});
-
-function addMsg(who, text, isUser) {
-  const div=document.createElement('div');
-  div.className='msg '+(isUser?'user':'ai');
-  div.innerHTML = '<div class="who">'+who+'</div><div class="body"></div>';
-  const body=div.querySelector('.body');
-  renderMarkdownInto(body, text);
-  chatList.appendChild(div);
-  chatList.scrollTop = chatList.scrollHeight;
-  return div;
-}
-function renderMarkdownInto(el, text) {
-  // basic markdown: ```luau ... ``` code blocks → pre with copy + send-to-studio buttons
-  let html = text
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/```(?:luau|lua)?\n([\s\S]*?)\n```/g, (m,code)=>{
-      const id='cb'+Math.random().toString(36).slice(2,8);
-      return '</p><div class="codewrap"><pre id="'+id+'">'+code.trimEnd()+'</pre><div class="codeblock-toolbar"><button class="btn ghost" data-copy="'+id+'">📋 Copy Luau</button><button class="btn ghost" data-dl="'+id+'">⬇ .lua</button><button class="btn" data-send="'+id+'" style="background:var(--moss);">📤 Send to Studio</button></div></div><p>';
-    })
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>')
-    .replace(/\n/g,'<br>');
-  el.innerHTML = '<p>'+html+'</p>';
-  el.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>{
-    copyText($(b.dataset.copy).innerText);
-  }));
-  el.querySelectorAll('[data-dl]').forEach(b=>b.addEventListener('click',()=>{
-    downloadText('devai-script.lua', $(b.dataset.dl).innerText);
-  }));
-  el.querySelectorAll('[data-send]').forEach(b=>b.addEventListener('click',()=>{
-    sendToStudio(b.dataset.send, null, null);
-  }));
+  return `## ⚔ ${name}\n\nHere's a complete starter **${topic}**. Click **📤 Send to Studio** on each block.\n\n### 1. Shared Module\n\`\`\`lua\n-- @location ReplicatedStorage.Modules.${name}\nlocal ${name} = {}\n${name}.Config = { MaxItems = 50, DefaultCurrency = 0, Debug = true }\nfunction ${name}.Log(...)\n    if ${name}.Config.Debug then print(\"[${name}]\", ...) end\nend\nreturn ${name}\n\`\`\`\n\n### 2. Server\n\`\`\`lua\n-- @location ServerScriptService.${name}Service\nlocal RS = game:GetService(\"ReplicatedStorage\")\nlocal PS = game:GetService(\"Players\")\nlocal DSS = game:GetService(\"DataStoreService\")\nlocal Mod = require(RS:WaitForChild(\"Modules\"):WaitForChild(\"${name}\"))\nlocal Remotes = RS:FindFirstChild(\"Remotes\") or Instance.new(\"Folder\")\nRemotes.Name = \"Remotes\"; Remotes.Parent = RS\nlocal getData = Instance.new(\"RemoteFunction\")\ngetData.Name = \"Get${name}Data\"; getData.Parent = Remotes\nlocal updateEv = Instance.new(\"RemoteEvent\")\nupdateEv.Name = \"${name}Updated\"; updateEv.Parent = Remotes\nlocal store = DSS:GetDataStore(\"${name}_v1\"); local cache = {}\nlocal function load(p) local ok,d=pcall(function()return store:GetAsync(\"u_\"..p.UserId)end);return ok and d or {coins=Mod.Config.DefaultCurrency,items={}}; end\nlocal function save(p) local d=cache[p.UserId]; if d then pcall(function()store:SetAsync(\"u_\"..p.UserId,d)end) end end\nPS.PlayerAdded:Connect(function(p) cache[p.UserId]=load(p); Mod.Log(\"Loaded\",p.Name) end)\nPS.PlayerRemoving:Connect(save)\ngame:BindToClose(function()for _,p in PS:GetPlayers()do save(p)end end)\ngetData.OnServerInvoke=function(p)return cache[p.UserId]end\nMod.Log(\"${name}Service started\")\n\`\`\`\n\n### 3. Client\n\`\`\`lua\n-- @location StarterPlayerScripts.${name}Client\nlocal RS = game:GetService(\"ReplicatedStorage\")\nlocal PS = game:GetService(\"Players\")\nlocal Mod = require(RS:WaitForChild(\"Modules\"):WaitForChild(\"${name}\"))\nlocal Remotes = RS:WaitForChild(\"Remotes\")\nlocal data = Remotes:WaitForChild(\"Get${name}Data\"):InvokeServer()\nRemotes:WaitForChild(\"${name}Updated\").OnClientEvent:Connect(function(d) data=d; Mod.Log(\"Updated\") end)\nMod.Log(\"Client ready\", data)\n\`\`\`\n\n> ⚠ Starter template. Add an API key (Settings → API Keys) for code tailored to your project. Free DeepSeek/Groq keys work great.`;
 }
 
-// ---------- DEVAI BRIDGE (localhost relay, like Lemonade) ----------
-const BRIDGE = 'http://127.0.0.1:42069';
-let bridgeOk = false;
-let bridgeCheckInterval = null;
+function downloadPlugin(){const a=document.createElement('a');a.href='DevAI-v6.zip';a.download='DevAI-v6.zip';a.click();}
+function downloadBat(){const a=document.createElement('a');a.href='install-devai.bat';a.download='install-devai.bat';a.click();}
 
-async function bridgeFetch(path, opts={}) {
-  try {
-    const res = await fetch(BRIDGE+path, { signal: AbortSignal.timeout(1500), ...opts });
-    if (!res.ok) throw new Error('HTTP '+res.status);
-    return await res.json();
-  } catch(e) { return null; }
-}
-
-async function bridgePost(path, data) {
-  try {
-    const res = await fetch(BRIDGE+path, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(data), signal: AbortSignal.timeout(2000)
-    });
-    return res.ok;
-  } catch(e) { return false; }
-}
-
-async function sendToStudio(preId, titleOverride, typeOverride) {
-  const code = (preId && $(preId)?.innerText) || $('codeBlock')?.innerText || $('guiCode')?.innerText || $('animCode')?.innerText || '';
-  if(!code) { toast('No code to send. Generate a script first.'); return; }
-  const title = (titleOverride || 'DevAI Script').substring(0,40);
-  const stype = typeOverride || 'Script';
-  const target = stype === 'LocalScript' ? 'StarterPlayerScripts'
-               : stype === 'ModuleScript' ? 'ReplicatedStorage'
-               : 'ServerScriptService';
-  const ok = await bridgePost('/send-studio', {title, type:stype, target, code});
-  if (ok) {
-    toast('📤 Sent to Studio! Auto-inserting in ~1s.');
-    appendStudioLog('📤 OUT → Studio: '+title+' ('+stype+')', 'moss');
-  } else {
-    toast('❌ Bridge not running. Double-click start-devai.bat and make sure Studio is open with the DevAI plugin.');
-  }
-}
-
-// Studio Sync UI handlers
-async function checkBridge() {
-  const st = await bridgeFetch('/status');
-  if (st && st.ok) {
-    if (!bridgeOk) {
-      bridgeOk = true;
-      $('studioStatus').textContent = '🟢 Local bridge connected (no relay needed!)';
-      $('studioStatus').style.color = 'var(--moss)';
-      appendStudioLog('✅ Connected to DevAI local bridge at '+BRIDGE, 'gold-light');
-    }
-    // Poll incoming messages from Studio
-    const poll = await bridgeFetch('/poll-web');
-    if (poll && poll.messages) {
-      for (const m of poll.messages) {
-        if (m.kind === 'hello') {
-          appendStudioLog('✅ Studio plugin is online!', 'gold-light');
-          $('studioStatus').textContent = '🟢 Studio plugin connected — AI can see your project.';
-        } else if (m.kind === 'explorer') {
-          appendStudioLog('📂 Received Explorer snapshot ('+(m.data?.length||0)+' chars)', 'amber');
-          $('studioContext').value = m.data;
-          toast('📂 Explorer received — AI can see your project!');
-        } else if (m.kind === 'script') {
-          appendStudioLog('📄 Received script: '+m.name+' ('+(m.data?.length||0)+' chars)', 'amber');
-          const existing = $('studioContext').value || '';
-          $('studioContext').value = (existing?existing+'\n\n---\n\n':'') + m.data;
-          toast('📄 Script received by AI!');
-        } else if (m.kind === 'ping') {
-          appendStudioLog('💬 '+m.data, 'moss');
-        }
-      }
-    }
-  } else {
-    if (bridgeOk) {
-      bridgeOk = false;
-      $('studioStatus').textContent = '⚪ Bridge not detected. Run start-devai.bat.';
-      $('studioStatus').style.color = 'var(--dim)';
-    }
-  }
-}
-
-async function startStudioListen() {
-  if (studioListenActive) return;
-  studioListenActive = true;
-  appendStudioLog('🎧 Connecting to local DevAI bridge at 127.0.0.1:42069…');
-  // Poll bridge every 1s
-  bridgeCheckInterval = setInterval(checkBridge, 1000);
-  // Do an immediate check
-  checkBridge();
-  $('startListen').textContent = '⏹ Stop listening';
-}
-function stopStudioListen() {
-  studioListenActive = false;
-  if (bridgeCheckInterval) clearInterval(bridgeCheckInterval);
-  bridgeCheckInterval = null;
-  bridgeOk = false;
-  $('studioStatus').textContent = '⚪ Stopped.';
-  $('studioStatus').style.color = 'var(--dim)';
-  $('startListen').textContent = '👂 Start listening';
-}
-function appendStudioLog(text, color) {
-  const log = $('studioLog');
-  if(!log) return;
-  const line = document.createElement('div');
-  line.style.color = color ? `var(--${color})` : 'var(--text-dim)';
-  line.textContent = new Date().toLocaleTimeString().padStart(8,' ')+'  '+text;
-  if (log.firstChild && log.firstChild.tagName==='I') log.innerHTML='';
-  log.appendChild(line);
-  log.scrollTop = log.scrollHeight;
-}
-async function sendChat() {
-  const txt=$('chatInput').value.trim();
-  if(!txt) return;
-  $('chatInput').value='';
-  addMsg('You', txt, true);
-  const wait=addMsg('DevAI','<i>Thinking…</i>', false);
-  try {
-    const messages=[
-      {role:'system', content:buildSystemContext()},
-    ];
-    // send last 20 messages from DOM
-    chatList.querySelectorAll('.msg:not(.thinking)').forEach(m=>{
-      // skip the wait placeholder
-      if (m===wait) return;
-      messages.push({role: m.classList.contains('user')?'user':'assistant', content: m.querySelector('.body').innerText});
-    });
-    const reply=await llmCall(messages);
-    wait.querySelector('.body').innerText='';
-    renderMarkdownInto(wait.querySelector('.body'), reply);
-    chatList.scrollTop = chatList.scrollHeight;
-  } catch(e) {
-    wait.querySelector('.body').innerHTML = '<span style="color:var(--red)">❌ '+e.message+'</span>';
-  }
-}
-$('sendChat').addEventListener('click', sendChat);
-$('chatInput').addEventListener('keydown', (e)=>{
-  if (e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendChat(); }
-});
-$('clearChat').addEventListener('click', ()=>{ chatList.innerHTML=''; });
-$('resetConn').addEventListener('click', ()=>{
-  localStorage.removeItem('devai_state');
-  localStorage.setItem('devai_version', String(APP_VERSION));
-  state.llmUrl=CONFIG.DEFAULT_LLM_URL;
-  state.llmModel=CONFIG.DEFAULT_MODEL;
-  state.llmKey='';
-  state.meshyKey='';
-  save();
-  refreshSettingsUI();
-  buildChatModelPicker();
-  toast('🔄 Reset — using free Pollinations.');
-  location.reload();
-});
-
-// ---------- 3D MODELS (Meshy) ----------
-const MESHY_BASE='https://api.meshy.ai';
-async function meshyRequest(path, opts={}) {
-  if (!state.meshyKey) throw new Error('No Meshy API key. Add one in Settings (free: meshy.ai/settings/api).');
-  const res = await fetch(MESHY_BASE+path, {
-    method: opts.method||'GET',
-    headers:{
-      'Authorization':'Bearer '+state.meshyKey,
-      'Content-Type':'application/json',
-    },
-    body: opts.body ? JSON.stringify(opts.body) : undefined,
-  });
-  if(!res.ok) throw new Error('Meshy '+res.status+': '+await res.text());
-  return res.json();
-}
-async function meshyPoll(taskId, onProgress) {
-  while(true){
-    const t = await meshyRequest('/openapi/v2/text-to-3d/'+taskId);
-    if (t.status==='SUCCEEDED') return t;
-    if (t.status==='FAILED'||t.status==='EXPIRED') throw new Error('Meshy task '+t.status+': '+(t.error||''));
-    if (onProgress) onProgress(t.progress||0, t);
-    await new Promise(r=>setTimeout(r, 3500));
-  }
-}
-function showMeshResult(model) {
-  const r=$('meshResult'); r.style.display='block';
-  $('meshResultTitle').textContent='✅ '+ (model.name||'Model ready');
-  const thumb=model.thumbnail_url||(model.model_urls?.glb||'');
-  $('meshThumb').src=thumb||'';
-  $('dlGlb').href=model.model_urls?.glb||'#';
-  $('dlFbx').href=model.model_urls?.fbx||'#';
-  $('dlObj').href=model.model_urls?.obj||'#';
-  const v=$('meshViewer');
-  v.src=model.model_urls?.glb||'';
-  v.alt=model.name||'3D model';
-  state.mesh = Object.assign(state.mesh||{}, { model_urls: model.model_urls, name:model.name });
-}
-$('meshGenerate').addEventListener('click', async ()=>{
-  const prompt=$('meshPrompt').value.trim();
-  if(!prompt) return toast('Enter a prompt first');
-  const style=$('meshStyle').value;
-  const provider = state.meshProvider || 'hunyuan';
-
-  // Hunyuan3D "no key" mode: generate 4 turntable views via Pollinations image API (using plain <img> because fetch() triggers 403 CORS blocks)
-  if (provider === 'hunyuan') {
-    setStatus('meshStatus','Generating 4-view turntable (no key, ~30s total)…','warn');
-    $('meshProgress').style.display='block';
-    $('meshProgress').firstElementChild.style.width='5%';
-    $('meshPreview').style.display='block';
-    $('meshPreview').scrollIntoView({behavior:'smooth',block:'nearest'});
-    const views = [
-      {label:'Front view',  angle:'front view, facing camera'},
-      {label:'Right side',  angle:'right side view, profile'},
-      {label:'Back view',   angle:'back view, from behind'},
-      {label:'3/4 view',    angle:'three-quarter view, 45 degree angle'},
-    ];
-    // Build grid with plain <img> tags — these don't send Origin header so Pollinations won't 403 them.
-    const cells = views.map((v,i)=>{
-      const p = encodeURIComponent(prompt+', 3D game asset, white background, studio lighting, '+v.angle+', '+style+' style');
-      const seed = Math.floor(Math.random()*99999);
-      const url = `https://image.pollinations.ai/prompt/${p}?width=512&height=512&seed=${seed}&nologo=true&model=flux&enhance=true`;
-      return `<div style="text-align:center">
-        <img src="${url}" alt="${v.label}" width="100%"
-             style="border-radius:8px;border:1px solid var(--border);background:#111;display:block;min-height:220px"
-             onload="this.dataset.loaded=1;this.style.opacity=1"
-             referrerpolicy="no-referrer"/>
-        <div class="tiny" style="color:var(--text-dim);margin-top:4px">${v.label}</div>
-      </div>`;
-    }).join('');
-    $('meshPreviewBody').innerHTML = `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;">${cells}</div>
-      <div style="display:flex;gap:10px;margin-top:10px;align-items:center;flex-wrap:wrap;">
-        <div class="progress" style="flex:1;min-width:200px;margin:0;"><div id="turntableProgress" style="width:0%;background:var(--moss);height:100%;border-radius:999px;transition:width .3s"></div></div>
-        <span id="turntableCount" class="tiny" style="color:var(--text-dim);">Loading 0/4…</span>
-      </div>
-      <p class="tiny" style="color:var(--amber);margin:10px 0 4px;">
-        ⚠ <b>4-view turntable reference (no-key mode).</b> These are AI reference views you can use to sculpt the model in Studio or Blender. For a real downloadable <code>.glb</code>/<code>.fbx</code> mesh file (you can import directly into Studio), switch provider to <b>Meshy</b> below (100 free credits/month — Google signup, no credit card).
-      </p>
-      <p class="tiny" style="color:var(--text-faint);margin:0;">Images: Pollinations/Flux. If images stay blank for >45s, try again (servers can be slow).</p>
-    `;
-    // Track image loads via JS so progress bar updates
-    let loaded = 0;
-    const imgs = $('meshPreviewBody').querySelectorAll('img');
-    imgs.forEach(img=>{
-      const done = ()=>{
-        loaded++;
-        $('turntableProgress').style.width = Math.round(loaded/imgs.length*100)+'%';
-        $('turntableCount').textContent = 'Loaded '+loaded+'/'+imgs.length;
-        if (loaded === imgs.length) {
-          $('meshProgress').firstElementChild.style.width='100%';
-          setStatus('meshStatus','✓ 4-view turntable ready (no-key mode).','ok');
-        }
-      };
-      img.addEventListener('load', done);
-      img.addEventListener('error', done);
-    });
-    return;
-  }
-
-  if (!state.meshyKey && provider === 'meshy') {
-    setStatus('meshStatus','❌ Enter a Meshy key in Settings (100 free/month).','err');
-    toast('Get a free Meshy key: meshy.ai/settings/api');
-    goPage('settings'); return;
-  }
-  if (!state.meshyKey && provider === 'tripo') {
-    setStatus('meshStatus','❌ Enter a Tripo key in Settings.','err');
-    goPage('settings'); return;
-  }
-
-  // Meshy path
-  $('meshGenerate').disabled=true;
-  setStatus('meshStatus','Requesting preview…','warn');
-  $('meshProgress').style.display='block';
-  $('meshProgress').firstElementChild.style.width='5%';
-  try{
-    const created = await meshyRequest('/openapi/v2/text-to-3d',{
-      method:'POST',
-      body:{
-        mode:'preview',
-        prompt:prompt,
-        art_style:style,
-        negative_prompt:'low quality, blurry, extra limbs, distorted, watermark',
-      },
-    });
-    const tid=created.result;
-    setStatus('meshStatus','Generating preview… (≈30–60s)','warn');
-    const finished=await meshyPoll(tid,(p)=>{
-      $('meshProgress').firstElementChild.style.width=Math.round(p*100)+'%';
-      setStatus('meshStatus','Preview '+Math.round(p*100)+'%','warn');
-    });
-    $('meshProgress').firstElementChild.style.width='100%';
-    showMeshResult({ name:'Preview: '+prompt.slice(0,40)+'…', model_urls: finished.model_urls, thumbnail_url: finished.thumbnail_url });
-    state.mesh.previewTaskId=tid;
-    state.mesh.model_urls=finished.model_urls;
-    state.mesh.thumbnail_url=finished.thumbnail_url;
-    $('meshRefine').disabled=false;
-    $('meshRig').disabled=false;
-    setStatus('meshStatus','Preview ready ✓','ok');
-  } catch(e){
-    setStatus('meshStatus','❌ '+e.message,'err');
-  } finally{
-    $('meshGenerate').disabled=false;
-  }
-});
-$('meshRefine').addEventListener('click', async ()=>{
-  if (!state.mesh?.previewTaskId) return toast('Generate a preview first');
-  $('meshRefine').disabled=true;
-  setStatus('meshStatus','Starting high-poly refine…','warn');
-  $('meshProgress').style.display='block';
-  $('meshProgress').firstElementChild.style.width='10%';
-  try{
-    const created=await meshyRequest('/openapi/v2/text-to-3d',{method:'POST',body:{
-      mode:'refine', preview_task_id:state.mesh.previewTaskId, enable_pbr:true,
-    }});
-    const finished=await meshyPoll(created.result,(p)=>{
-      $('meshProgress').firstElementChild.style.width=Math.round(p*100)+'%';
-      setStatus('meshStatus','Refine '+Math.round(p*100)+'%','warn');
-    });
-    showMeshResult({ name:'Refined (PBR) model', model_urls:finished.model_urls, thumbnail_url:finished.thumbnail_url });
-    state.mesh.refineTaskId=finished.id;
-    state.mesh.model_urls=finished.model_urls;
-    setStatus('meshStatus','Refined PBR model ready ✓','ok');
-  } catch(e){ setStatus('meshStatus','❌ '+e.message,'err'); }
-  finally{ $('meshRefine').disabled=false; }
-});
-// Meshy v1 rig endpoint
-async function meshyRig(taskId) {
-  const height=parseFloat($('meshHeight').value)||1.7;
-  const created=await meshyRequest('/openapi/v1/rigging',{method:'POST',body:{
-    input_task_id:taskId,
-    height_meters:height,
-  }});
-  const rigId=created.result;
-  while(true){
-    await new Promise(r=>setTimeout(r,4000));
-    const t=await meshyRequest('/openapi/v1/rigging/'+rigId);
-    if(t.status==='SUCCEEDED') return t;
-    if(t.status==='FAILED'||t.status==='EXPIRED') throw new Error('Rig failed: '+(t.error||''));
-    setStatus('meshStatus','Rigging… '+Math.round((t.progress||0)*100)+'%','warn');
-  }
-}
-$('meshRig').addEventListener('click', async ()=>{
-  // rig either the refined model or the preview
-  const taskId = state.mesh?.refineTaskId || state.mesh?.previewTaskId;
-  if(!taskId) return toast('Generate a model first');
-  $('meshRig').disabled=true;
-  setStatus('meshStatus','Rigging character + generating walk/run animations (~90s)…','warn');
-  $('rigLinks').style.display='none';
-  try{
-    const rig=await meshyRig(taskId);
-    // rig.model_urls includes rigged glb/fbx and animation loops
-    state.mesh.rig=rig;
-    $('dlRigGlb').href=rig.model_urls?.glb||rig.glb||rig.rigged_glb||'#';
-    $('dlRigFbx').href=rig.model_urls?.fbx||rig.fbx||rig.rigged_fbx||'#';
-    // Meshy v1 rig response: animations.walk / animations.run
-    const walk = rig.animations?.walk?.fbx || rig.walk?.fbx || rig.walk_fbx || rig.model_urls?.walk_fbx;
-    const run  = rig.animations?.run?.fbx  || rig.run?.fbx  || rig.run_fbx  || rig.model_urls?.run_fbx;
-    // If walk/run not present directly, Meshy rig API returns them as separate downloadable links — fall back to showing the rigged files.
-    if (walk) $('dlWalk').href=walk; else $('dlWalk').style.display='none';
-    if (run)  $('dlRun').href=run;  else $('dlRun').style.display='none';
-    $('dlWalk').style.display=walk?'':'none';
-    $('dlRun').style.display=run?'':'none';
-    $('rigLinks').style.display='grid';
-    setStatus('meshStatus','Rigged ✓ Download GLB/FBX plus walk/run','ok');
-    // Update viewer to the rigged glb
-    const rigGlb = rig.model_urls?.glb || rig.glb;
-    if (rigGlb) $('meshViewer').src=rigGlb;
-  } catch(e){ setStatus('meshStatus','❌ '+e.message,'err'); }
-  finally{ $('meshRig').disabled=false; }
-});
-$('copyGlb').addEventListener('click',()=>{
-  const url=$('dlGlb').href;
-  if(!url||url==='') return toast('Generate a model first');
-  copyText(url); toast('GLB URL copied — paste into DevAI plugin in Studio to auto-import.');
-});
-
-// ---------- THUMBNAILS ----------
-$('thumbGenerate').addEventListener('click', async ()=>{
-  const prompt=$('thumbPrompt').value.trim();
-  const style=$('thumbStyle').value;
-  const endpoint=$('thumbEndpoint').value;
-  if(!prompt) return toast('Enter a prompt');
-  setStatus('thumbStatus','Generating thumbnail…','warn');
-  $('thumbResult').style.display='none';
-  try{
-    let url='';
-    if(endpoint==='pollinations'){
-      const sizes = { cinematic:'1920x1080', 'cartoon':'1920x1080', 'icon':'512x512' };
-      const size=sizes[style]||'1920x1080';
-      const styleAdd = style==='cinematic' ? ' cinematic lighting, dramatic god rays, ancient fantasy, gold and bronze tones, mossy stone castle, rainforest'
-        : style==='cartoon' ? ' cartoon, bright saturated colors, high-contrast Roblox thumbnail, readable from small size'
-        : ' game icon, circular crop safe, simple silhouette, gold-brown ancient fantasy theme';
-      url='https://image.pollinations.ai/prompt/'+encodeURIComponent(prompt + styleAdd)+'?width='+size.split('x')[0]+'&height='+size.split('x')[1]+'&nologo=true&seed='+Math.floor(Math.random()*1e6);
-    } else {
-      // OpenRouter /chat/completions image generation not standard; fall back to pollinations with a toast
-      toast('OpenRouter image gen requires a vision/FLUX-capable model — using Pollinations instead.');
-      url='https://image.pollinations.ai/prompt/'+encodeURIComponent(prompt)+'?width=1920&height=1080&nologo=true';
-    }
-    // preload
-    setStatus('thumbStatus','Downloading…','warn');
-    await new Promise((res,rej)=>{
-      const img=new Image();
-      img.onload=()=>res();
-      img.onerror=()=>rej(new Error('Image generation failed'));
-      img.src=url;
-    });
-    $('thumbImg').src=url;
-    $('thumbLink').href=url;
-    $('thumbDl').href=url;
-    $('thumbResult').style.display='block';
-    setStatus('thumbStatus','Thumbnail ready ✓','ok');
-  } catch(e){ setStatus('thumbStatus','❌ '+e.message,'err'); }
-});
-$('thumbCopy').addEventListener('click',()=>{
-  copyText($('thumbLink').href);
-});
-
-// ---------- GUI Generator ----------
-$('guiGenerate').addEventListener('click', async ()=>{
-  const desc=$('guiPrompt').value.trim();
-  if(!desc) return toast('Describe your GUI');
-  setStatus('guiStatus','Generating UI script…','warn');
-  $('guiResult').style.display='none';
-  try{
-    const sys = buildSystemContext() + '\nGenerate a single LocalScript that creates a Roblox GUI from the user\'s description. Parent the GUI to PlayerGui. Use matching gold-brown/bronze/amber DevAI ancient-fantasy theme unless the user specifies another style. Use UDim2, UICorner, UIStroke, TweenService for hover effects. Output ONLY a fenced luau code block.';
-    const reply=await llmCall([
-      {role:'system',content:sys},
-      {role:'user',content:desc},
-    ],{max_tokens:4000});
-    const code=(reply.match(/```(?:luau|lua)?\s*\n?([\s\S]*?)\n?```/)||[,''])[1].trim() || reply;
-    $('guiCode').textContent=code;
-    $('guiResult').style.display='block';
-    setStatus('guiStatus','Done ✓','ok');
-  } catch(e){ setStatus('guiStatus','❌ '+e.message,'err'); }
-});
-$('guiCopy').addEventListener('click',()=>copyText($('guiCode').textContent));
-$('guiDownload').addEventListener('click',()=>downloadText('DevAI_GUI_LocalScript.lua',$('guiCode').textContent));
-$('guiSend').addEventListener('click',()=>sendToStudio(null, 'DevAI_GUI', 'LocalScript'));
-
-// ---------- Focused Code ----------
-$('codeGenerate').addEventListener('click', async ()=>{
-  const name=$('codeName').value.trim()||'Script';
-  const type=$('codeType').value;
-  const target=$('codeTarget').value.trim()||'ServerScriptService';
-  const desc=$('codePrompt').value.trim();
-  if(!desc) return toast('Describe what the script should do');
-  setStatus('codeStatus','Generating '+type+'…','warn');
-  $('codeResult').style.display='none';
-  try{
-    const fence='```';
-    const sys = buildSystemContext() + '\nGenerate a complete Roblox '+type+' named "'+name+'" intended for placement in '+target+'. Output ONLY a fenced '+fence+'luau block with proper services, error handling, security checks, and comments. Begin the code with a comment line like "-- Place in: '+target+'.'+name+'". The code must be production-ready.';
-    const reply=await llmCall([
-      {role:'system',content:sys},
-      {role:'user',content:desc},
-    ],{max_tokens:4000});
-    const code=(reply.match(/```(?:luau|lua)?\s*\n?([\s\S]*?)\n?```/)||[,''])[1].trim() || reply;
-    $('codeTitle').textContent=type+': '+name;
-    $('codeBlock').textContent=code;
-    $('codeResult').style.display='block';
-    setStatus('codeStatus','Done ✓','ok');
-  } catch(e){ setStatus('codeStatus','❌ '+e.message,'err'); }
-});
-$('codeCopy').addEventListener('click',()=>copyText($('codeBlock').textContent));
-$('codeDownload').addEventListener('click',()=>downloadText(
-  ($('codeName').value||'script').replace(/[^a-zA-Z0-9_]/g,'_')+'.lua',
-  $('codeBlock').textContent
-));
-$('codeSend').addEventListener('click',()=>sendToStudio(null, $('codeName').value||'DevAI_Script', $('codeType')?.value?.includes('Local')?'LocalScript':$('codeType')?.value?.includes('Module')?'ModuleScript':'Script'));
-
-// ---------- Animations ----------
-$('animGen').addEventListener('click', async ()=>{
-  const ids=$('animIds').value.trim();
-  const parent=$('animParent').value.trim();
-  const key=$('animKey').value.trim();
-  const desc=$('animIds').value+' @ '+parent+' on key '+key;
-  setStatus('animStatus' in window?null:null,'',''); // no-op; reuse guiStatus slot unused here
-  $('animResultCard').style.display='none';
-  try{
-    const sys = buildSystemContext() + '\nGenerate a LocalScript that loads Animation objects, plays them on a Humanoid when the specified key is pressed. Use UserInputService. Output ONLY a fenced luau block.';
-    const userMsg = 'Animation IDs (comma-separated): '+ids+'\nHumanoid path: '+parent+'\nTrigger key: '+key+'\nGenerate a LocalScript that loads these animations, plays the first one on key press, stops on release (or toggles), and uses AnimationTrack with proper cleanup.';
-    const reply=await llmCall([{role:'system',content:sys},{role:'user',content:userMsg}],{max_tokens:3000});
-    const code=(reply.match(/```(?:luau|lua)?\s*\n?([\s\S]*?)\n?```/)||[,''])[1].trim() || reply;
-    $('animCode').textContent=code;
-    $('animResultCard').style.display='block';
-  } catch(e){ toast('❌ '+e.message); }
-});
-$('animCopy').addEventListener('click',()=>copyText($('animCode').textContent));
-$('animDownload').addEventListener('click',()=>downloadText('AnimationScript.lua',$('animCode').textContent));
-$('animSend').addEventListener('click',()=>sendToStudio(null, 'AnimationController', 'LocalScript'));
-
-// ---------- SETTINGS ----------
-function refreshSettingsUI() {
-  $('setLlmKey').value=state.llmKey||'';
-  $('setMeshyKey').value=state.meshyKey||state.tripoKey||'';
-  if($('meshProvider')) $('meshProvider').value = state.meshProvider||'hunyuan';
-  // Show a "saved" badge with last 4 chars
-  const badge=$('keySavedBadge');
-  if (state.llmKey && state.llmKey.length > 6) {
-    const last4 = state.llmKey.slice(-4);
-    badge.textContent = '— ✓ saved on this device (ends in …'+last4+')';
-    badge.style.color = 'var(--moss)';
-  } else {
-    badge.textContent = '';
-  }
-  $('setGame').value=state.memory.game||'';
-  $('setCurrency').value=state.memory.currency||'';
-  $('setMainUI').value=state.memory.mainUI||'';
-  $('setAdmin').value=state.memory.admin||'';
-  $('setExtra').value=state.memory.extra||'';
-  $('sessionCode').value=state.sessionCode||'';
-  // preset dropdown
-  const presetVal=state.llmUrl+'|'+state.llmModel;
-  const sel=$('setPreset');
-  let found=false;
-  for (const o of sel.options){
-    if (o.value===presetVal){ o.selected=true; found=true; break; }
-  }
-  if (!found){
-    sel.value='custom';
-    $('customLlm').style.display='block';
-    $('setLlmUrl').value=state.llmUrl;
-    $('setLlmModel').value=state.llmModel;
-  } else {
-    $('customLlm').style.display='none';
-  }
-  updatePresetHint();
-  // conn status
-  const cs=$('connStatus');
-  const isPoll = state.llmUrl && state.llmUrl.indexOf('pollinations.ai') !== -1;
-  const preset=PRESETS[state.llmUrl+'|'+state.llmModel];
-  const name = preset?preset.label:state.llmModel;
-  if (isPoll && (!state.llmKey || state.llmKey==='pollinations-free')) {
-    cs.textContent='⚡ '+name+' — free, no key needed';
-    cs.className='status ok';
-  } else if (state.llmKey && state.llmKey !== 'pollinations-free') {
-    if (state.usedDefaultKey) {
-      cs.textContent='⚔ Built-in key active — '+name;
-      cs.className='status';
-    } else {
-      cs.textContent='✓ '+name+' — key saved on this device';
-      cs.className='status ok';
-    }
-  } else {
-    cs.textContent='Pick a model in ⚙ Settings to get started.';
-    cs.className='status';
-  }
-  $('chatModelLabel').textContent = name;
-}
-function updatePresetHint() {
-  const v=$('setPreset').value;
-  const hint=$('llmKeyHint');
-  if(v==='custom'){
-    hint.innerHTML='Custom OpenAI-compatible endpoint. Enter base URL + model below. Key optional only if your endpoint allows anonymous access.';
-    return;
-  }
-  const p=PRESETS[v];
-  if(!p){ hint.innerHTML=''; return; }
-  const tag = p.local ? '<span style="color:var(--moss);font-weight:700;">LOCAL</span>'
-            : p.free && p.nokey ? '<span style="color:var(--green);font-weight:700;">NO KEY</span>'
-            : p.free ? '<span style="color:var(--moss);font-weight:700;">FREE</span>'
-            : p.paid ? '<span style="color:var(--red);font-weight:700;">PAID</span>'
-            : '<span style="color:var(--amber);font-weight:700;">PAYG</span>';
-  const link = p.signupUrl && !p.nokey ? ' Get key: <a href="'+p.signupUrl+'" target="_blank" style="color:var(--amber);">'+p.signup+'</a>.'
-              : p.nokey ? ' No signup — works instantly.' : '';
-  hint.innerHTML = tag + ' — ' + p.note + link;
-}
-$('setPreset').addEventListener('change',()=>{
-  const v=$('setPreset').value;
-  if(v==='custom'){
-    $('customLlm').style.display='block';
-  } else {
-    $('customLlm').style.display='none';
-    const [url,model]=v.split('|');
-    state.llmUrl=url; state.llmModel=model; save();
-  }
-  updatePresetHint();
-  refreshSettingsUI();
-  buildChatModelPicker();
-});
-$('saveLlm').addEventListener('click',()=>{
-  state.llmKey=$('setLlmKey').value.trim();
-  if($('setPreset').value==='custom'){
-    state.llmUrl=$('setLlmUrl').value.trim()||state.llmUrl;
-    state.llmModel=$('setLlmModel').value.trim()||state.llmModel;
-  }
-  // Clear the "pollinations-free" sentinel if user cleared the field
-  if(!state.llmKey && state.llmUrl.indexOf('pollinations.ai')===-1){
-    // No key + not pollinations = switch back to pollinations so the app keeps working
-    state.llmUrl=CONFIG.DEFAULT_LLM_URL; state.llmModel=CONFIG.DEFAULT_MODEL;
-    toast('No key saved — switched to free Pollinations');
-  }
-  save(); refreshSettingsUI(); buildChatModelPicker();
-  toast(state.llmKey?'✅ LLM key saved — remembered on this device.':'Switched to no-key mode.');
-});
-$('meshProvider')?.addEventListener('change',(e)=>{
-  state.meshProvider = e.target.value; save(); refreshSettingsUI();
-});
-$('saveMeshy').addEventListener('click',()=>{
-  state.meshyKey=$('setMeshyKey').value.trim();
-  state.meshProvider=$('meshProvider')?.value||'hunyuan';
-  save(); refreshSettingsUI();
-  toast(state.meshProvider.toUpperCase()+' key saved.');
-});
-$('saveMemory').addEventListener('click',()=>{
-  state.memory={
-    game:$('setGame').value.trim(),
-    currency:$('setCurrency').value.trim(),
-    mainUI:$('setMainUI').value.trim(),
-    admin:$('setAdmin').value.trim(),
-    extra:$('setExtra').value,
-  };
-  save(); toast('💾 Project memory saved');
-});
-$('testLlm').addEventListener('click', async ()=>{
-  setStatus('llmStatus','Testing…','warn');
-  try{
-    const reply=await llmCall([{role:'user',content:'Reply with exactly "DevAI online."'}],{max_tokens:50});
-    setStatus('llmStatus','✓ Connected: '+reply.slice(0,80),'ok');
-  } catch(e){ setStatus('llmStatus','❌ '+e.message,'err'); }
-});
-$('testMeshy').addEventListener('click', async ()=>{
-  setStatus('meshyStatus','Testing…','warn');
-  try{
-    // Meshy: GET /openapi/v2/me returns balance
-    const me=await fetch(MESHY_BASE+'/openapi/v2/me',{headers:{'Authorization':'Bearer '+state.meshyKey}});
-    if(!me.ok) throw new Error('Invalid key: '+await me.text());
-    const data=await me.json();
-    setStatus('meshyStatus','✓ Connected. Credits: '+(data.credit_balance??data.credits??'?'),'ok');
-  } catch(e){ setStatus('meshyStatus','❌ '+e.message,'err'); }
-});
-$('resetAll').addEventListener('click',()=>{
-  if(!confirm('Clear all saved keys and memory? This cannot be undone.')) return;
-  localStorage.removeItem('devai_state');
-  state.llmKey=''; state.meshyKey=''; state.memory={}; state.sessionCode='';
-  state.llmUrl='https://openrouter.ai/api/v1';
-  state.llmModel='meta-llama/llama-3.1-8b-instruct:free';
-  genSessionCode(); refreshSettingsUI(); toast('🗑 Cleared');
-});
-
-// ---------- STUDIO SYNC ----------
-$('genSession').addEventListener('click', ()=>{ genSessionCode(); });
-$('copySession').addEventListener('click',()=>copyText($('sessionCode').value));
-$('startListen').addEventListener('click', ()=>{
-  if (studioListenActive) stopStudioListen(); else startStudioListen();
-});
-$('clearCtx').addEventListener('click', ()=>{ $('studioContext').value=''; toast('Context cleared.'); });
-$('testRelay').addEventListener('click', async ()=>{
-  const r = $('relayTestResults');
-  r.innerHTML = '<span style="color:var(--text-dim)">Checking local bridge at 127.0.0.1:42069…</span>';
-  const st = await bridgeFetch('/status');
-  if (st && st.ok) {
-    r.innerHTML = '<div style="color:var(--moss)">✅ Local bridge is running! Click "👂 Start listening" to connect.</div>';
-  } else {
-    r.innerHTML = '<div style="color:var(--red)">❌ Bridge not reachable. <b>Double-click start-devai.bat</b> to start it, then refresh this page.<br><small style="color:var(--text-faint)">Make sure Roblox Studio is open with the DevAI plugin installed first, and your firewall isn\'t blocking localhost.</small></div>';
-  }
-});
-
-// ---------- boot ----------
-load();
-if (!state.sessionCode) genSessionCode();
-refreshSettingsUI();
-buildChatModelPicker();
-// Auto-start bridge listener if opened from start-devai.bat (?bridge=local)
-if (location.search.includes('bridge=local')) {
-  setTimeout(()=>{
-    goPage('studio');
-    startStudioListen();
-  }, 500);
-}
+function startPreview(){renderChat();}
+function toast(msg,kind){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show '+(kind||'');setTimeout(()=>t.classList.remove('show'),2800);}
+function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function escapeJs(s){return escapeHtml(s).replace(/\n/g,'\\n');}
+function showCmds(){document.getElementById('userInput').value='/create ';document.getElementById('userInput').focus();}
+function askAbout(q){showPage('chat');document.getElementById('userInput').value=q;document.getElementById('userInput').focus();}
