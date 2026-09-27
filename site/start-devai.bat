@@ -1,11 +1,11 @@
 @echo off
 SETLOCAL
-TITLE DevAI Server v26
+TITLE DevAI Server v28
 
 cd /d "%~dp0"
 
 echo.
-echo   ================ DevAI v26 (Lemonade Bridge) ================
+echo   ================ DevAI v28 (Lemonade UI) ================
 echo.
 
 REM Install plugin
@@ -17,18 +17,19 @@ echo   [ok] Plugin installed to %PLUGIN_DIR%
 REM Check Node
 where node >nul 2>&1
 if errorlevel 1 (
-    echo   [!!] Node.js not found.
-    echo        Please install Node.js from https://nodejs.org/ (LTS version),
+    echo   [!!] Node.js is not installed.
+    echo        Please install it from https://nodejs.org/ (LTS version, free),
     echo        then run this file again.
     echo.
     pause
     exit /b 1
 )
 
-REM Install backend deps
+REM Install backend deps (only if missing)
 if not exist "backend\node_modules" (
-    echo   [..] Installing backend dependencies (first run only)...
-    cd backend && call npm install --omit=dev --silent
+    echo   [..] Installing backend dependencies (first run only, ~30 seconds)...
+    cd backend
+    call npm install --omit=dev
     if errorlevel 1 (
         echo   [!!] npm install failed. Check your internet and try again.
         pause

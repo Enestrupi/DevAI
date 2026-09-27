@@ -14,10 +14,10 @@ let state = {
 
 document.addEventListener('DOMContentLoaded',()=>{
   marked.setOptions({gfm:true,breaks:true});
+  checkHealth(); // load models immediately via HTTP
   connectWS();
   renderHero();
-  setInterval(checkHealth,3000);
-  checkHealth();
+  setInterval(checkHealth,5000);
   document.addEventListener('click',e=>{
     if(!e.target.closest('.model-btn'))document.getElementById('picker').classList.remove('open');
   });
@@ -35,7 +35,21 @@ function connectWS(){
 function wsSend(o){if(ws&&ws.readyState===1)ws.send(JSON.stringify(o));}
 function checkHealth(){
   fetch('http://127.0.0.1:42069/api/health').then(r=>r.json()).then(j=>{setBackend(true);setStudioConn(!!j.connected);}).catch(()=>setBackend(false));
-  fetch('http://127.0.0.1:42069/api/models').then(r=>r.json()).then(j=>{state.models=j.models||[];renderPicker();}).catch(()=>{});
+  fetch('http://127.0.0.1:42069/api/models').then(r=>r.json()).then(j=>{
+    if(j.models&&j.models.length){state.models=j.models;renderPicker();renderKeyList();}
+  }).catch(()=>{
+    // Fallback: even if backend is down show all models so UI isn't empty
+    state.models=state.models.length?state.models:[
+      {id:'auto',name:'Auto',provider:'DevAI',best:'Picks the best model for your task',configured:true},
+      {id:'claude-sonnet',name:'Claude Sonnet',provider:'Anthropic',best:'Complex Roblox coding, architecture, debugging',configured:false},
+      {id:'gpt-4o',name:'GPT-4o',provider:'OpenAI',best:'General coding, Roblox systems, explanations',configured:false},
+      {id:'gpt-4o-mini',name:'GPT-4o Mini',provider:'OpenAI',best:'Fast responses, small scripts',configured:false},
+      {id:'gemini-pro',name:'Gemini Pro',provider:'Google',best:'Large context, multimodal',configured:false},
+      {id:'deepseek',name:'DeepSeek Coder',provider:'DeepSeek',best:'Coding & technical reasoning (free key)',configured:false},
+      {id:'groq-llm',name:'Llama 3.1 70B (Groq)',provider:'Groq',best:'Extremely fast responses (free key)',configured:false},
+    ];
+    renderPicker();renderKeyList();
+  });
 }
 
 function handle(m){
