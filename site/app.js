@@ -1,6 +1,6 @@
 // DevAI Web App — single-file JS, no framework, no build step.
 // All state lives in localStorage. All provider calls go directly from the browser.
-const APP_VERSION = 20;
+const APP_VERSION = 22;
 
 // ============================================================================
 // ⚔ DEVAI CONFIG — PASTE YOUR API KEYS HERE FOR "NO SETUP REQUIRED" LAUNCH
@@ -508,71 +508,105 @@ function renderMarkdownInto(el, text) {
   }));
 }
 
-// ---------- SEND TO STUDIO (ntfy pub/sub — multiple hosts for ad-blocker resilience) ----------
-const NTFY_HOSTS = [
-  'https://ntfy.nerdvpn.de',   // fastest (0.3s, Germany)
-  'https://ntfy.envs.net',     // reliable (USA)
-  'https://ntfy.sh',           // main — often ad-blocked
-];
-function ntfyUrl(host, topic, extra='') { return host+'/'+topic+extra; }
+// ---------- DEVAI BRIDGE (localhost relay, like Lemonade) ----------
+const BRIDGE = 'http://127.0.0.1:42069';
+let bridgeOk = false;
+let bridgeCheckInterval = null;
 
-// Test which relay host works in THIS browser (CORS/connectivity check)
-async function testRelayHosts() {
-  const results = [];
-  for (const host of NTFY_HOSTS) {
-    const start = performance.now();
-    let ok=false, err='';
-    try {
-      const res = await fetch(host+'/devai-conntest?r='+Math.random(), { cache:'no-store', signal: AbortSignal.timeout(8000) });
-      ok = res.ok || res.status === 404 || res.status === 400; // any response means host is reachable
-    } catch(e) { err = e.message; }
-    const ms = Math.round(performance.now()-start);
-    results.push({host:host.replace('https://',''), ok, ms, err});
-  }
-  return results;
+async function bridgeFetch(path, opts={}) {
+  try {
+    const res = await fetch(BRIDGE+path, { signal: AbortSignal.timeout(1500), ...opts });
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    return await res.json();
+  } catch(e) { return null; }
 }
 
-async function ntfyPost(topic, body, headers={}) {
-  let lastErr;
-  for (const host of NTFY_HOSTS) {
-    try {
-      const res = await fetch(ntfyUrl(host,topic), { method:'POST', body, headers });
-      if (res.ok) return res;
-      lastErr = 'HTTP '+res.status;
-    } catch(e) { lastErr = e.message; }
-  }
-  throw new Error('All relay hosts failed ('+lastErr+'). Try disabling your ad-blocker on this site, or use Manual Paste mode (click a script\'s "📋 Copy" button and paste into Studio).');
+async function bridgePost(path, data) {
+  try {
+    const res = await fetch(BRIDGE+path, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(data), signal: AbortSignal.timeout(2000)
+    });
+    return res.ok;
+  } catch(e) { return false; }
 }
 
 async function sendToStudio(preId, titleOverride, typeOverride) {
   const code = (preId && $(preId)?.innerText) || $('codeBlock')?.innerText || $('guiCode')?.innerText || $('animCode')?.innerText || '';
   if(!code) { toast('No code to send. Generate a script first.'); return; }
-  if(!state.sessionCode) genSessionCode();
-  const sess = state.sessionCode;
   const title = (titleOverride || 'DevAI Script').substring(0,40);
   const stype = typeOverride || 'Script';
   const target = stype === 'LocalScript' ? 'StarterPlayerScripts'
                : stype === 'ModuleScript' ? 'ReplicatedStorage'
                : 'ServerScriptService';
-  const message = title+'|'+stype+'|'+target+'|'+code;
-  if (message.length > 3900) {
-    toast('⚠ Script too long (>4KB). Copy and paste instead.');
-    return;
-  }
-  const topic = 'devai-' + sess.toLowerCase();
-  try {
-    await ntfyPost(topic, message, { 'Title':'DevAI: '+title, 'Tags':'robot,inbox' });
-    if (!studioListenActive) startStudioListen();
-    toast('📤 Sent to Studio! Should auto-insert in 1-2 seconds.');
+  const ok = await bridgePost('/send-studio', {title, type:stype, target, code});
+  if (ok) {
+    toast('📤 Sent to Studio! Auto-inserting in ~1s.');
     appendStudioLog('📤 OUT → Studio: '+title+' ('+stype+')', 'moss');
-  } catch(e) {
-    toast('❌ Send failed: '+e.message);
+  } else {
+    toast('❌ Bridge not running. Double-click start-devai.bat and make sure Studio is open with the DevAI plugin.');
   }
 }
 
-// ---------- RECEIVE FROM STUDIO ----------
-let studioListenActive = false;
-let studioAbort = null;
+// Studio Sync UI handlers
+async function checkBridge() {
+  const st = await bridgeFetch('/status');
+  if (st && st.ok) {
+    if (!bridgeOk) {
+      bridgeOk = true;
+      $('studioStatus').textContent = '🟢 Local bridge connected (no relay needed!)';
+      $('studioStatus').style.color = 'var(--moss)';
+      appendStudioLog('✅ Connected to DevAI local bridge at '+BRIDGE, 'gold-light');
+    }
+    // Poll incoming messages from Studio
+    const poll = await bridgeFetch('/poll-web');
+    if (poll && poll.messages) {
+      for (const m of poll.messages) {
+        if (m.kind === 'hello') {
+          appendStudioLog('✅ Studio plugin is online!', 'gold-light');
+          $('studioStatus').textContent = '🟢 Studio plugin connected — AI can see your project.';
+        } else if (m.kind === 'explorer') {
+          appendStudioLog('📂 Received Explorer snapshot ('+(m.data?.length||0)+' chars)', 'amber');
+          $('studioContext').value = m.data;
+          toast('📂 Explorer received — AI can see your project!');
+        } else if (m.kind === 'script') {
+          appendStudioLog('📄 Received script: '+m.name+' ('+(m.data?.length||0)+' chars)', 'amber');
+          const existing = $('studioContext').value || '';
+          $('studioContext').value = (existing?existing+'\n\n---\n\n':'') + m.data;
+          toast('📄 Script received by AI!');
+        } else if (m.kind === 'ping') {
+          appendStudioLog('💬 '+m.data, 'moss');
+        }
+      }
+    }
+  } else {
+    if (bridgeOk) {
+      bridgeOk = false;
+      $('studioStatus').textContent = '⚪ Bridge not detected. Run start-devai.bat.';
+      $('studioStatus').style.color = 'var(--dim)';
+    }
+  }
+}
+
+async function startStudioListen() {
+  if (studioListenActive) return;
+  studioListenActive = true;
+  appendStudioLog('🎧 Connecting to local DevAI bridge at 127.0.0.1:42069…');
+  // Poll bridge every 1s
+  bridgeCheckInterval = setInterval(checkBridge, 1000);
+  // Do an immediate check
+  checkBridge();
+  $('startListen').textContent = '⏹ Stop listening';
+}
+function stopStudioListen() {
+  studioListenActive = false;
+  if (bridgeCheckInterval) clearInterval(bridgeCheckInterval);
+  bridgeCheckInterval = null;
+  bridgeOk = false;
+  $('studioStatus').textContent = '⚪ Stopped.';
+  $('studioStatus').style.color = 'var(--dim)';
+  $('startListen').textContent = '👂 Start listening';
+}
 function appendStudioLog(text, color) {
   const log = $('studioLog');
   if(!log) return;
@@ -582,96 +616,6 @@ function appendStudioLog(text, color) {
   if (log.firstChild && log.firstChild.tagName==='I') log.innerHTML='';
   log.appendChild(line);
   log.scrollTop = log.scrollHeight;
-}
-async function startStudioListen() {
-  if(!state.sessionCode) genSessionCode();
-  const topic = 'devai-' + state.sessionCode.toLowerCase();
-  if (studioAbort) studioAbort.abort();
-  studioAbort = new AbortController();
-  studioListenActive = true;
-  $('studioStatus').textContent = '🟢 Listening on '+state.sessionCode+'…';
-  $('studioStatus').style.color = 'var(--moss)';
-  appendStudioLog('🎧 Started listening for Studio messages…');
-  try {
-    let lastEventId = '';
-    let backoff = 2;
-    let errCount = 0;
-    let hostIdx = 0;
-    appendStudioLog('🎧 Polling for messages (relay: '+NTFY_HOSTS[hostIdx].replace('https://','')+')…');
-    while(studioListenActive) {
-      const host = NTFY_HOSTS[hostIdx % NTFY_HOSTS.length];
-      try {
-        const url = ntfyUrl(host, topic, '/json?since='+(lastEventId||'all')+'&r='+Math.random().toString(36).slice(2)+'&poll=0');
-        const res = await fetch(url, { signal: studioAbort.signal, cache:'no-store' });
-        if (res.status === 429 || res.status >= 500) {
-          errCount++;
-          appendStudioLog('⚠ '+host.replace('https://','')+' busy ('+res.status+'), switching host…', 'amber');
-          hostIdx++;
-          await new Promise(r=>setTimeout(r, 1000));
-          continue;
-        }
-        if (!res.ok) {
-          errCount++;
-          appendStudioLog('⚠ HTTP '+res.status+' from '+host.replace('https://','')+', trying next host…', 'amber');
-          hostIdx++;
-          await new Promise(r=>setTimeout(r, backoff*1000));
-          backoff = Math.min(backoff*2, 15);
-          continue;
-        }
-        errCount = 0; backoff = 2;
-        const text = await res.text();
-        for (const line of text.split('\n')) {
-          if (line.length < 5) continue;
-          try {
-            const evt = JSON.parse(line);
-            if (evt.event === 'open') continue;
-            if (evt.id) lastEventId = evt.id;
-            if (evt.event && evt.event !== 'message') continue;
-            const tags = evt.tags || '';
-            if (tags.includes('inbox')) continue;
-            const body = evt.message || '';
-            let data;
-            try { data = JSON.parse(body); } catch { data = null; }
-            if (data && data.kind) {
-              if (data.kind === 'hello') {
-                $('studioStatus').textContent = '🟢 Studio connected! PlaceId='+(data.data.match(/PlaceId=(\d+)/)?.[1]||'?');
-                $('studioStatus').style.color = 'var(--moss)';
-                appendStudioLog('✅ Plugin connected: '+data.data, 'gold-light');
-              } else if (data.kind === 'explorer') {
-                appendStudioLog('📂 Received Explorer snapshot ('+data.data.length+' chars) — injected into AI context.', 'amber');
-                $('studioContext').value = data.data;
-                toast('📂 Explorer sent to AI — AI can now see your project!');
-              } else if (data.kind === 'script') {
-                appendStudioLog('📄 Received script: '+data.path+' ('+(data.data?.length||0)+' chars)', 'amber');
-                const existing = $('studioContext').value || '';
-                $('studioContext').value = (existing ? existing + '\n\n---\n\n' : '') + data.data;
-                toast('📄 Script sent to AI!');
-              } else {
-                appendStudioLog('📩 '+data.kind+': '+(data.data||'').slice(0,200), 'moss');
-              }
-            } else if (body && !body.startsWith('{')) {
-              appendStudioLog('📩 Message: '+body.slice(0,120));
-            }
-          } catch(e) { /* ignore bad json lines */ }
-        }
-      } catch(e) {
-        if (e.name === 'AbortError') throw e;
-        errCount++;
-        appendStudioLog('⚠ Can\'t reach '+host.replace('https://','')+' — ad-blocker? Trying next host in '+backoff+'s…', errCount<2?'amber':'red');
-        hostIdx++;
-        await new Promise(r=>setTimeout(r, backoff*1000));
-        backoff = Math.min(backoff*2, 15);
-      }
-      await new Promise(r=>setTimeout(r,2000));
-    }
-  } catch(e) {
-    if (e.name !== 'AbortError') {
-      appendStudioLog('❌ Listener error: '+e.message, 'red');
-    }
-  }
-  studioListenActive = false;
-  $('studioStatus').textContent = '⚪ Stopped.';
-  $('studioStatus').style.color = 'var(--dim)';
 }
 async function sendChat() {
   const txt=$('chatInput').value.trim();
@@ -759,49 +703,59 @@ $('meshGenerate').addEventListener('click', async ()=>{
   const style=$('meshStyle').value;
   const provider = state.meshProvider || 'hunyuan';
 
-  // Hunyuan3D "no key" mode: generate 4 turntable views via Pollinations image API
+  // Hunyuan3D "no key" mode: generate 4 turntable views via Pollinations image API (using plain <img> because fetch() triggers 403 CORS blocks)
   if (provider === 'hunyuan') {
     setStatus('meshStatus','Generating 4-view turntable (no key, ~30s total)…','warn');
     $('meshProgress').style.display='block';
     $('meshProgress').firstElementChild.style.width='5%';
     $('meshPreview').style.display='block';
     $('meshPreview').scrollIntoView({behavior:'smooth',block:'nearest'});
-    $('meshPreviewBody').innerHTML = '<div id="turntableGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;"></div>';
-    const grid = $('turntableGrid');
     const views = [
       {label:'Front view',  angle:'front view, facing camera'},
       {label:'Right side',  angle:'right side view, profile'},
       {label:'Back view',   angle:'back view, from behind'},
       {label:'3/4 view',    angle:'three-quarter view, 45 degree angle'},
     ];
-    for (let i=0;i<views.length;i++){
-      const v = views[i];
-      const cell = document.createElement('div');
-      cell.style.cssText='text-align:center;';
-      cell.innerHTML=`<div style="background:#1a1a1a;border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;height:220px;color:var(--text-faint);font-size:11px;">⏳ Generating ${v.label}…</div><div class="tiny" style="color:var(--text-dim);margin-top:4px">${v.label}</div>`;
-      grid.appendChild(cell);
+    // Build grid with plain <img> tags — these don't send Origin header so Pollinations won't 403 them.
+    const cells = views.map((v,i)=>{
       const p = encodeURIComponent(prompt+', 3D game asset, white background, studio lighting, '+v.angle+', '+style+' style');
       const seed = Math.floor(Math.random()*99999);
       const url = `https://image.pollinations.ai/prompt/${p}?width=512&height=512&seed=${seed}&nologo=true&model=flux&enhance=true`;
-      $('meshProgress').firstElementChild.style.width = Math.round((i+0.5)/views.length*100)+'%';
-      // Fetch as blob so it works even if <img> CORS is weird (converts to object URL in our origin)
-      fetch(url).then(res=>{ if(!res.ok) throw new Error('HTTP '+res.status); return res.blob(); })
-        .then(blob=>{
-          const objUrl = URL.createObjectURL(blob);
-          cell.innerHTML=`<img src="${objUrl}" alt="${v.label}" style="width:100%;border-radius:8px;border:1px solid var(--border);background:#111;"/><div class="tiny" style="color:var(--text-dim);margin-top:4px">${v.label}</div>`;
-        })
-        .catch(err=>{
-          cell.innerHTML=`<div style="padding:40px;background:#2a1a1a;border-radius:8px;color:#e88;border:1px solid #c44;font-size:11px;height:220px;display:flex;align-items:center;justify-content:center;text-align:center;">❌ Blocked by ad-blocker<br><small>(${err.message})</small></div><div class="tiny" style="color:var(--text-dim);margin-top:4px">${v.label}</div>`;
-        });
-      await new Promise(r=>setTimeout(r,500));
-    }
-    $('meshProgress').firstElementChild.style.width='100%';
-    const note = document.createElement('div');
-    note.innerHTML = `<p class="tiny" style="color:var(--amber);margin:10px 0 4px;">
-      ⚠ <b>4-view turntable preview (no-key mode).</b> These are AI reference views. For a real <code>.glb</code>/<code>.fbx</code> mesh, switch provider to <b>Meshy</b> in Settings (100 free/month, Google signup, no card: <a href="https://www.meshy.ai/settings/api" target="_blank" style="color:var(--amber)">meshy.ai/settings/api</a>).
-    </p><p class="tiny" style="color:var(--text-faint);margin:0;">If cells show red errors, disable your ad-blocker for this site.</p>`;
-    $('meshPreviewBody').appendChild(note);
-    setStatus('meshStatus','✓ Generating views (each appears as it finishes, ~10s per view)','ok');
+      return `<div style="text-align:center">
+        <img src="${url}" alt="${v.label}" width="100%"
+             style="border-radius:8px;border:1px solid var(--border);background:#111;display:block;min-height:220px"
+             onload="this.dataset.loaded=1;this.style.opacity=1"
+             referrerpolicy="no-referrer"/>
+        <div class="tiny" style="color:var(--text-dim);margin-top:4px">${v.label}</div>
+      </div>`;
+    }).join('');
+    $('meshPreviewBody').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;">${cells}</div>
+      <div style="display:flex;gap:10px;margin-top:10px;align-items:center;flex-wrap:wrap;">
+        <div class="progress" style="flex:1;min-width:200px;margin:0;"><div id="turntableProgress" style="width:0%;background:var(--moss);height:100%;border-radius:999px;transition:width .3s"></div></div>
+        <span id="turntableCount" class="tiny" style="color:var(--text-dim);">Loading 0/4…</span>
+      </div>
+      <p class="tiny" style="color:var(--amber);margin:10px 0 4px;">
+        ⚠ <b>4-view turntable reference (no-key mode).</b> These are AI reference views you can use to sculpt the model in Studio or Blender. For a real downloadable <code>.glb</code>/<code>.fbx</code> mesh file (you can import directly into Studio), switch provider to <b>Meshy</b> below (100 free credits/month — Google signup, no credit card).
+      </p>
+      <p class="tiny" style="color:var(--text-faint);margin:0;">Images: Pollinations/Flux. If images stay blank for >45s, try again (servers can be slow).</p>
+    `;
+    // Track image loads via JS so progress bar updates
+    let loaded = 0;
+    const imgs = $('meshPreviewBody').querySelectorAll('img');
+    imgs.forEach(img=>{
+      const done = ()=>{
+        loaded++;
+        $('turntableProgress').style.width = Math.round(loaded/imgs.length*100)+'%';
+        $('turntableCount').textContent = 'Loaded '+loaded+'/'+imgs.length;
+        if (loaded === imgs.length) {
+          $('meshProgress').firstElementChild.style.width='100%';
+          setStatus('meshStatus','✓ 4-view turntable ready (no-key mode).','ok');
+        }
+      };
+      img.addEventListener('load', done);
+      img.addEventListener('error', done);
+    });
     return;
   }
 
@@ -1186,26 +1140,20 @@ $('resetAll').addEventListener('click',()=>{
 });
 
 // ---------- STUDIO SYNC ----------
-$('genSession').addEventListener('click', ()=>{ genSessionCode(); if(studioListenActive){ studioListenActive=false; studioAbort?.abort(); setTimeout(startStudioListen,200); }});
+$('genSession').addEventListener('click', ()=>{ genSessionCode(); });
 $('copySession').addEventListener('click',()=>copyText($('sessionCode').value));
-$('startListen').addEventListener('click', startStudioListen);
+$('startListen').addEventListener('click', ()=>{
+  if (studioListenActive) stopStudioListen(); else startStudioListen();
+});
 $('clearCtx').addEventListener('click', ()=>{ $('studioContext').value=''; toast('Context cleared.'); });
-
 $('testRelay').addEventListener('click', async ()=>{
   const r = $('relayTestResults');
-  r.innerHTML = '<span style="color:var(--text-dim)">Testing…</span>';
-  const results = await testRelayHosts();
-  r.innerHTML = results.map(x=>{
-    const color = x.ok ? 'var(--moss)' : 'var(--red)';
-    const icon = x.ok ? '✅' : '❌';
-    const detail = x.ok ? `${x.ms}ms` : x.err.slice(0,40);
-    return `<div style="color:${color}">${icon} ${x.host} — ${detail}</div>`;
-  }).join('');
-  const working = results.filter(x=>x.ok).length;
-  if (working === 0) {
-    r.innerHTML += '<div style="color:var(--red);margin-top:6px;font-family:var(--body);font-size:11px;">❌ ALL relays blocked by your ad-blocker/VPN. Disable your ad-blocker on enestrupi.github.io (click the 🛡 shield in the address bar), or use <b>Manual Paste mode</b>: every code block has a 📋 Copy button that copies the script to your clipboard — just paste into Studio.</div>';
+  r.innerHTML = '<span style="color:var(--text-dim)">Checking local bridge at 127.0.0.1:42069…</span>';
+  const st = await bridgeFetch('/status');
+  if (st && st.ok) {
+    r.innerHTML = '<div style="color:var(--moss)">✅ Local bridge is running! Click "👂 Start listening" to connect.</div>';
   } else {
-    r.innerHTML += `<div style="color:var(--moss);margin-top:6px;font-family:var(--body);font-size:11px;">✅ ${working}/${results.length} relays reachable. Click "Start listening" then connect the plugin.</div>`;
+    r.innerHTML = '<div style="color:var(--red)">❌ Bridge not reachable. <b>Double-click start-devai.bat</b> to start it, then refresh this page.<br><small style="color:var(--text-faint)">Make sure Roblox Studio is open with the DevAI plugin installed first, and your firewall isn\'t blocking localhost.</small></div>';
   }
 });
 
@@ -1214,3 +1162,10 @@ load();
 if (!state.sessionCode) genSessionCode();
 refreshSettingsUI();
 buildChatModelPicker();
+// Auto-start bridge listener if opened from start-devai.bat (?bridge=local)
+if (location.search.includes('bridge=local')) {
+  setTimeout(()=>{
+    goPage('studio');
+    startStudioListen();
+  }, 500);
+}

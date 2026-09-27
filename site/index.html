@@ -413,32 +413,30 @@ iframe.model-viewer { width:100%; height:400px; border:none; border-radius:8px; 
     <!-- STUDIO SYNC -->
     <section class="page" id="page-studio">
       <h2>🔌 Studio Sync</h2>
-      <p class="subtitle">Pair this website with the DevAI Roblox plugin so scripts flow both ways: website → Studio (auto-paste) and Studio → website (AI can SEE your project, selected scripts, and errors).</p>
+      <p class="subtitle">Lemonade-style direct connection via local bridge (no relays, no ad-blocker issues, no session codes).</p>
 
       <div class="card">
-        <label>Your session code</label>
-        <div style="display:flex; gap:8px;">
-          <input type="text" id="sessionCode" readonly style="flex:1; font-size:22px; text-align:center; letter-spacing:6px; font-weight:900; color:var(--gold-light); font-family:var(--mono);"/>
-          <button class="btn bronze" id="genSession">🔄 New Code</button>
-          <button class="btn ghost" id="copySession">📋 Copy</button>
-        </div>
-        <p class="tiny" style="margin-top:8px;">
-          <b>Steps:</b> (1) Copy the code above → (2) Paste it in the DevAI plugin panel inside Studio → (3) Click 🔌 Connect in the plugin → (4) Status below turns 🟢 green when Studio is online.
-        </p>
+        <h3 style="color:var(--gold-light); margin-top:0;">How to connect (3 steps)</h3>
+        <ol style="color:var(--text);font-size:12px;line-height:1.8;padding-left:20px;">
+          <li><b>Install plugin</b> (one-time): extract <code>DevAI-v4.zip</code>, double-click <code>start-devai.bat</code> — it auto-installs the plugin for you.</li>
+          <li><b>Open Roblox Studio</b>, click the ⚔ DevAI button on the Plugins tab.</li>
+          <li><b>Double-click <code>start-devai.bat</code></b> (keep the black window open). It starts the bridge AND opens this website automatically — you'll see 🟢 Connected below in ~3 seconds.</li>
+        </ol>
+        <p class="tiny" style="color:var(--text-faint);margin:0;">The bridge is a tiny Python server running only on <code>127.0.0.1:42069</code> (your own computer). Nothing leaves your PC except AI requests to Pollinations/OpenRouter.</p>
       </div>
 
       <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
           <h3 style="color:var(--gold-light); margin:0;">🟢 Connection status</h3>
           <div style="display:flex; gap:6px;">
-            <button class="btn ghost" id="testRelay" style="font-size:11px;">🔍 Test relay</button>
+            <button class="btn ghost" id="testRelay" style="font-size:11px;">🔍 Check bridge</button>
             <button class="btn moss" id="startListen">👂 Start listening</button>
           </div>
         </div>
-        <p class="tiny" style="margin:8px 0 0;color:var(--dim);">"Start listening" must be clicked after you connect the plugin in Studio.</p>
-        <div id="relayTestResults" style="margin-top:8px;font-size:10px;font-family:var(--mono);"></div>
+        <div id="relayTestResults" style="margin-top:8px;font-size:11px;font-family:var(--mono);"></div>
+        <span id="studioStatus" class="tiny" style="display:block;margin-top:6px;color:var(--dim);">⚪ Not connected. Click "Check bridge" or "Start listening" to begin.</span>
         <div id="studioLog" style="margin-top:10px; max-height:200px; overflow-y:auto; background:var(--bg-panel); border:1px solid var(--border); border-radius:6px; padding:8px; font-family:var(--mono); font-size:10px; color:var(--text-dim);">
-          <i style="color:var(--text-faint)">Nothing received yet. Click "Test relay" first to make sure your browser can reach the relay, then "Start listening", then connect the plugin.</i>
+          <i style="color:var(--text-faint)">Run start-devai.bat then click "Start listening" or "Check bridge".</i>
         </div>
       </div>
 
@@ -513,22 +511,38 @@ iframe.model-viewer { width:100%; height:400px; border:none; border-radius:8px; 
       </div>
 
       <div class="card">
-        <h3 style="color:var(--gold-light); margin-top:0;">3D Models (Meshy or Tripo)</h3>
-        <p class="tiny" style="margin-bottom:8px;">Choose a provider and paste its key. Meshy gives 100 free credits/month (no card) and is easiest. Tripo key you already have has 0 credits but works if you top up.</p>
-        <div class="row">
-          <div style="flex:1;">
-            <label>Provider</label>
-            <select id="meshProvider">
-              <option value="hunyuan" selected>🆓 Hunyuan3D Preview (no key, image turntable — GLB requires key)</option>
-              <option value="meshy">Meshy (100 free credits/month ← real GLB download)</option>
-              <option value="tripo">Tripo (your key — needs credits)</option>
-            </select>
+        <h3 style="color:var(--gold-light); margin-top:0;">🧊 3D Model Providers — what each is best at</h3>
+        <p class="tiny" style="margin-bottom:10px;">Pick a provider below and paste its key (if required). Then switch to it in the 🧊 3D Models tab.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;">
+          <div style="background:#1a1510;border:1px solid var(--border);border-radius:8px;padding:10px;">
+            <b style="color:var(--moss)">🆓 Hunyuan3D Preview</b>
+            <div style="color:var(--text-dim);margin-top:4px;">Best for: <b>fast visual reference / concept art of what your model will look like</b>. Produces 4-view images (front/side/back/3-4) but NOT a downloadable .glb mesh. No key, unlimited, free.</div>
+            <div class="tiny" style="color:var(--gold);margin-top:4px;">⚡ Speed: ~30s • ✅ No key needed</div>
+          </div>
+          <div style="background:#1a1510;border:1px solid var(--border);border-radius:8px;padding:10px;">
+            <b style="color:var(--amber)">🥇 Meshy</b>
+            <div style="color:var(--text-dim);margin-top:4px;">Best for: <b>real game-ready GLB/FBX meshes you can import directly into Studio</b>. Includes auto-PBR texturing, retopology, rigging, walk/run animations. 100 free credits/month.</div>
+            <div style="margin-top:6px;"><a href="https://www.meshy.ai/settings/api" target="_blank" style="color:var(--amber);font-size:11px">→ Get free key (Google signup, no card)</a></div>
+          </div>
+          <div style="background:#1a1510;border:1px solid var(--border);border-radius:8px;padding:10px;">
+            <b style="color:var(--gold-light)">🥈 Tripo AI</b>
+            <div style="color:var(--text-dim);margin-top:4px;">Best for: <b>very fast low-poly meshes (60-90s)</b>, good for quick props and environment assets. New accounts get limited credits; key you provided has 0 balance.</div>
+            <div style="margin-top:6px;"><a href="https://platform.tripo3d.ai" target="_blank" style="color:var(--gold-light);font-size:11px">→ Top up at platform.tripo3d.ai</a></div>
+          </div>
+          <div style="background:#1a1510;border:1px solid var(--border);border-radius:8px;padding:10px;">
+            <b style="color:var(--text-faint)">🔮 More coming</b>
+            <div style="color:var(--text-dim);margin-top:4px;">Rodin Gen-2.5, CSM, Luma Dream Machine, and Stability 3D will be added as their free tiers stabilize. For now Meshy gives the best free-to-quality ratio.</div>
           </div>
         </div>
-        <label style="margin-top:10px;">API Key</label>
-        <input type="password" id="setMeshyKey" placeholder="msy_... (Meshy) or tsc_/tsk_... (Tripo)"/>
-        <p class="tiny">Get a free Meshy key: <a href="https://www.meshy.ai/settings/api" target="_blank" style="color:var(--amber);">meshy.ai/settings/api</a> (Sign up with Google → 100 free credits instantly, no credit card).</p>
-        <div class="btnrow">
+        <label style="margin-top:12px;display:block;">Active provider</label>
+        <select id="meshProvider">
+          <option value="hunyuan" selected>🆓 Hunyuan3D 4-view reference (no key, instant)</option>
+          <option value="meshy">🥇 Meshy — real GLB/FBX + rigging (100 free/month)</option>
+          <option value="tripo">🥈 Tripo — fast low-poly (needs credits)</option>
+        </select>
+        <label style="margin-top:10px;display:block;">API Key</label>
+        <input type="password" id="setMeshyKey" placeholder="msy_... for Meshy, or tsk_... for Tripo"/>
+        <div class="btnrow" style="margin-top:8px;">
           <button class="btn green" id="testMeshy">🔌 Test Key</button>
           <button class="btn" id="saveMeshy">💾 Save</button>
           <span id="meshyStatus" class="tiny"></span>
@@ -555,6 +569,6 @@ iframe.model-viewer { width:100%; height:400px; border:none; border-radius:8px; 
   </main>
 </div>
 <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-<script src="app.js?v=20"></script>
+<script src="app.js?v=22"></script>
 </body>
 </html>
