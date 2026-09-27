@@ -182,14 +182,13 @@ function queueSend(btn){
   if(!path)path=guessPath(code);
   const parts=path.split('.');const parent=parts.slice(0,-1).join('.');const name=parts[parts.length-1];
   const type=guessType(code,name);
-  // Check if script exists (we don't know server-side, so always show diff if user has confirm on — show source preview)
   const confirmOn=document.getElementById('setConfirm')?.checked!==false;
-  const op='create_instance'; // backend will create or update by path
-  const action={op,params:{className:type,parent,name,source:code}};
+  // Default op is create_instance; if user says it's an update we'd switch, but create + replace is safe in Studio via new instance
+  const action={op:'create_instance',params:{className:type,parent,name,source:code}};
   const meta={path,name,type,code};
   if(confirmOn){
-    showDiffModal(op,meta,()=>{wsSend({type:'send_to_studio',action});toast('📤 Sent to backend → Studio','ok');},()=>{toast('Cancelled','warn');});
-  }else{wsSend({type:'send_to_studio',action});toast('📤 Sent to backend → Studio','ok');}
+    showDiffModal('create_instance',meta,()=>{wsSend({type:'send_to_studio',action});toast('📤 Sent create '+name+' → '+parent,'ok');},()=>{toast('Cancelled','warn');});
+  }else{wsSend({type:'send_to_studio',action});toast('📤 Sent create '+name+' → '+parent,'ok');}
 }
 function showDiffModal(op,meta,onApply,onReject){
   document.getElementById('diffMeta').innerHTML=`<b style="color:var(--amber)">${op.toUpperCase()}</b> · <span style="font-family:var(--mono);color:var(--text)">${meta.path}</span> <span style="color:var(--muted)">(${meta.type})</span>`;
@@ -248,6 +247,12 @@ function finishAction(m){
 
 /* ========= PAIR / STUDIO ========= */
 function genPairCode(){wsSend({type:'generate_pair'});}
+function sendAction(action){
+  if(!connected){toast('Backend not running — start start-devai.bat','err');return;}
+  if(!studioConnected && !['get_project_tree','get_selection','get_script','get_output','scan_project'].includes(action.op)){toast('Studio not connected','err');return;}
+  wsSend({type:'send_to_studio',action});
+  toast('📤 Queued: '+action.op,'ok');
+}
 function reqScan(){wsSend({type:'send_to_studio',action:{op:'scan_project'}});showPage('scan');toast('📤 Scan requested from Studio','ok');}
 function startOutput(){wsSend({type:'send_to_studio',action:{op:'get_output',subscribe:true}});showPage('output');toast('📤 Requesting output stream — toggle button in plugin if it does not start','ok');}
 function showScan(d){

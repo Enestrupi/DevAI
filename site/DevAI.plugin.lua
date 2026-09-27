@@ -228,8 +228,22 @@ local function execAction(a)
     if op=="create_instance" then
         local parent,err = ensurePath(a.params.parent or "ServerScriptService")
         if not parent then return fail(err) end
+        local name = a.params.name or "DevAI_Script"
+        local existing = parent:FindFirstChild(name)
+        if existing then
+            -- If it's the same class and a script, treat as update (no overwrite prompt needed — user already approved create; but if it exists we should be explicit)
+            if a.params.source and existing:IsA("LuaSourceContainer") and existing.ClassName==(a.params.className or "Script") then
+                existing.Source = a.params.source or ""
+                Selection:Set{existing}; pcall(function()StudioService:OpenScript(existing)end)
+                addLog("ok","Updated existing",existing:GetFullName())
+                post("/api/plugin/result",{token=token,actionId=a.id,success=true,path=existing:GetFullName(),updated=true})
+                return
+            else
+                return fail(name.." already exists under "..parent:GetFullName().." (different class — use update/rename/move)")
+            end
+        end
         local inst = Instance.new(a.params.className or "Script")
-        inst.Name = a.params.name or "DevAI_Script"
+        inst.Name = name
         if a.params.source and (inst:IsA("LuaSourceContainer")) then inst.Source = a.params.source end
         inst.Parent = parent
         Selection:Set{inst}; pcall(function()StudioService:OpenScript(inst)end)

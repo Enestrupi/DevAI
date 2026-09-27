@@ -193,7 +193,14 @@ function mockReply(text,mode){
 }
 
 // ─── Action Queue → Plugin ──────────────────────────────────────────────────
+const ALLOWED_OPS = new Set(['get_project_tree','get_selection','get_script','get_output','create_instance','update_script','rename_instance','move_instance','delete_instance','scan_project']);
+
 function queueAction(ws,action,source){
+  if(!action||!action.op||!ALLOWED_OPS.has(action.op)){
+    const err='Unknown or disallowed op: '+(action&&action.op);
+    if(ws)ws.send(JSON.stringify({type:'error',error:err}));else console.log('Rejected:',err);
+    return null;
+  }
   const id = state.actionIdCounter++;
   const rec = {id,op:action.op,params:action.params||{},source,status:'pending',ts:Date.now()};
   state.actionQueue.push(rec);
@@ -255,12 +262,12 @@ app.post('/api/plugin/event',(req,res)=>{
   else if(event==='scan'){broadcast({type:'scan',data});}
   res.json({ok:true});
 });
-app.get('/api/health',(_,res)=>res.json({ok:true,version:26,connected:!!state.pluginConn}));
+app.get('/api/health',(_,res)=>res.json({ok:true,version:27,connected:!!state.pluginConn}));
 app.get('/api/models',(_,res)=>res.json({models:listModels()}));
 
 // ─── Start ──────────────────────────────────────────────────────────────────
 server.listen(PORT,'127.0.0.1',()=>{
-  console.log(`⚔ DevAI backend v26 running on http://127.0.0.1:${PORT}`);
+  console.log(`⚔ DevAI backend v27 running on http://127.0.0.1:${PORT}`);
   console.log(`  Website:  http://127.0.0.1:${PORT}/`);
   console.log(`  Plugin long-poll:  /api/plugin/*`);
 });
