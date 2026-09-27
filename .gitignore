@@ -1,20 +1,20 @@
-.DS_Store
-Thumbs.db
-.vscode/
-.idea/
-*.log
-*.zip
-*.rbxm
 
 # Python/build caches
+*.log
+*.rbxm
+*.zip
+.DS_Store
 .cache/
+.env
+.env.local
+.idea/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
-__pycache__/
-node_modules/
-.env
-.env.local
-uploads/
 .sudo_as_admin_successful
+.vscode/
+Thumbs.db
+__pycache__/
 backend/node_modules
+node_modules/
+uploads/
