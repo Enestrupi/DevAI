@@ -1,11 +1,11 @@
 @echo off
 SETLOCAL
-TITLE 🐯 Enes AI v31 Tiger Edition
+TITLE ⚔ DevAI Bridge v3.0
 
 cd /d "%~dp0"
 
 echo.
-echo   =============== 🐯 ENES AI v31 (Tiger Edition) ===============
+echo   =============== ⚔ DEVAI v3.0 BRIDGE ================
 echo.
 
 REM Install plugin
@@ -14,30 +14,31 @@ if not exist "%PLUGIN_DIR%" mkdir "%PLUGIN_DIR%"
 copy /Y "DevAI.plugin.lua" "%PLUGIN_DIR%\" >nul
 echo   [ok] Plugin installed to %PLUGIN_DIR%
 
-REM Ensure backend folder exists with server files
-if not exist "backend" mkdir backend
-if not exist "backend\server.js" copy /Y "server.js" "backend\server.js" >nul 2>&1
-if not exist "backend\_mockreplies.js" copy /Y "_mockreplies.js" "backend\_mockreplies.js" >nul 2>&1
+REM Ensure bridge folder
+if not exist "bridge" mkdir bridge
+if not exist "bridge\bridge.js" copy /Y "bridge\bridge.js" "bridge\bridge.js" >nul 2>&1
 
 REM Check Node
 where node >nul 2>&1
 if errorlevel 1 (
-    echo   [!!] Node.js is not installed.
-    echo        Install it FREE from https://nodejs.org/ (LTS version),
-    echo        then run this file again.
+    echo   [!!] Node.js not found.
+    echo        Install FREE from https://nodejs.org/ (LTS) and run again.
+    echo.
+    echo   You can also use the website WITHOUT the bridge at:
+    echo        https://enestrupi.github.io/DevAI/
     echo.
     pause
     exit /b 1
 )
 
-echo   [ok] Starting Enes AI on http://127.0.0.1:42069
-echo        Keep this black window open while using Enes AI.
-echo        Close this window to stop the server.
-echo   ==============================================================
+echo   [ok] Starting DevAI Bridge on http://127.0.0.1:42069
+echo        Keep this window open while using DevAI.
+echo        Close this window to stop the bridge.
+echo   ======================================================
 echo.
 
 start "" http://127.0.0.1:42069/
-cd backend && node server.js
+cd bridge && node bridge.js
 echo.
-echo   Server stopped.
+echo   Bridge stopped.
 pause

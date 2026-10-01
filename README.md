@@ -1,83 +1,53 @@
-# ⚔ DevAI
+# ⚔ DevAI v3.0
 
-Ancient-fantasy themed AI co-developer for **Roblox Studio**. Two parts, one brand:
+Ancient-fantasy themed AI co-developer for **Roblox Studio**. Gold/bronze aesthetic. Castle-forge vibes.
 
-1. **`site/`** — standalone browser web app (chat, 3D models, thumbnails, GUI, Luau code, animations, Studio Sync). Static, no backend.
-2. **`DevAI.plugin.lua`** — the Roblox Studio plugin you install once. Talks to the same providers and adds in-Studio convenience (Output-log scanning, one-click script insertion, quick Meshy 3D previews, future relay support).
+## 🏰 Parts
 
-![theme](https://img.shields.io/badge/theme-ancient%20fantasy-gold) ![version](https://img.shields.io/badge/version-v1.2-gold)
+1. **`site/`** — static web app (chat, 3D models, thumbnails, GUI, code, animations, studio sync). Deployable to GitHub Pages as-is, no build step.
+2. **`DevAI.plugin.lua`** — Roblox Studio plugin with 7 tabs: Chat, 3D, Thumbs, Code, GUI, Animations, Debug + Settings.
+3. **`bridge/bridge.js`** — tiny zero-dependency Node.js local bridge on port 42069 for Send-to-Studio queuing (same protocol as the original bridge.py but no Python required).
+4. **`start-devai.bat`** — one-click Windows launcher: installs plugin, starts bridge, opens browser.
 
----
+## ⚡ Quick start (Windows)
 
-## 🌐 Web app (recommended entry point)
+1. Install [Node.js LTS](https://nodejs.org/) (free).
+2. Download this repo (or the latest release zip).
+3. Double-click **`start-devai.bat`**.
+4. Browser opens `http://127.0.0.1:42069/` with the DevAI site.
+5. In Roblox Studio, click the **⚔ DevAI** toolbar button. The panel shows "Bridge: connected" when synced.
+6. On the website, click any quick-start or type a prompt. Code blocks have a **📤 Send to Studio** button — one click inserts directly into your game.
 
-The browser app is the easiest way to use DevAI. No install, no Roblox Studio required (though you can paste everything you make into Studio).
+## 🌐 Without the bridge
 
-- **💬 Chat** — Roblox-specialized AI assistant (Luau, services, Remotes, DataStores).
-- **🧊 3D Models** — text → GLB/FBX via Meshy, live `<model-viewer>` preview, refine to PBR, auto-rig humanoids with walk/run animations.
-- **🖼 Thumbnails** — free image generation via Pollinations (no key needed).
-- **🎨 GUI Generator** — describe a menu/HUD/shop → working gold-brown themed Luau LocalScript.
-- **📜 Luau Code** — targeted Script / LocalScript / ModuleScript generation for a specific service path.
-- **💃 Animations** — AnimationController/LocalScript generator; use rigged Meshy characters + walk/run FBX with Roblox Animation Editor.
-- **🔌 Studio Sync** — 6-character session code for future auto-pairing with the plugin.
-- **⚙ Settings** — pick a provider preset (OpenRouter-Free, Claude, GPT-4o-mini, Groq, Ollama, custom), paste keys, store project memory. Keys stay in `localStorage` only — no backend.
+You can also use the website standalone (no Node.js, no local server):
+- Visit https://enestrupi.github.io/DevAI/
+- Code blocks have a Copy button; paste scripts into Studio manually.
 
-### Run locally
-```bash
-cd docs
-python3 -m http.server 8080
-# open http://localhost:8080
-```
+## 🔑 API keys
 
-### Deploy to GitHub Pages (free)
+Keys live **only in your browser** (`localStorage`) on the website, and **only in the plugin** (`plugin:SetSetting`) inside Studio. DevAI never sees them — calls go straight to the provider from your machine.
+
+Free options that work out of the box:
+- **Chat**: OpenRouter free Llama 3.1 8B (100% free: https://openrouter.ai/keys)
+- **Chat**: Groq Llama 3.1 70B (free credits: https://console.groq.com)
+- **Thumbnails**: Pollinations (no key, no cost at all)
+- **3D Models**: Meshy (200 free credits/month: https://www.meshy.ai/settings/api)
+
+## 🧩 Plugin tabs
+
+- **💬 Chat** — in-Studio Roblox assistant, with ⇅ Sync/↑ Selected/↑ Script quick buttons to send project context.
+- **🧊 3D** — Meshy text→GLB generation helper.
+- **🖼 Thumbs** — one-click Pollinations thumbnail generation (URL copied to clipboard).
+- **📜 Code** — targeted Script/LocalScript/ModuleScript generation sent to a chosen service.
+- **🎨 GUI** — gold/bronze themed GUI LocalScript generation.
+- **💃 Anim** — AnimationController generation for rigged characters (paste Walk/Idle/Run IDs).
+- **🔧 Debug** — captures last Output error, sends it with project context to the AI; Settings panel for API keys.
+
+## 🚀 Deploy to GitHub Pages
+
 1. Push this repo to GitHub.
 2. Repo **Settings → Pages** → Source = `main` branch, folder = `/docs`.
 3. Live at `https://<your-username>.github.io/DevAI/`.
 
-Free-tier defaults work out of the box once you add one free API key:
-- **Chat / Code / GUI**: [OpenRouter free Llama 3.1 8B](https://openrouter.ai/keys) (100% free).
-- **Thumbnails**: Pollinations (no key, no cost).
-- **3D Models**: [Meshy](https://www.meshy.ai/settings/api) (200 free credits/month, no card).
-
----
-
-## 🧩 Roblox Studio plugin
-
-**Install**:
-1. In Roblox Studio, open the Plugins tab → Plugins Folder button. That opens `%LOCALAPPDATA%\Roblox\Plugins` (Windows) / `~/Documents/Roblox/Plugins` (Mac).
-2. Create a subfolder named `DevAI` and drop `DevAI.plugin.lua` inside it (or just drop the `.lua` file directly).
-3. Restart Studio (or re-save the file for auto-reload).
-4. Click the **⚔ DevAI** toolbar button to open the dock widget.
-
-**What the plugin gives you** (all inside Studio):
-- **Chat** tab — same Roblox-specialized assistant. Code blocks have *Copy* / *Download* / one-click *Insert into Explorer*.
-- **3D Models** tab — Meshy text → preview → refine → rig, with GLB/FBX download links copied to clipboard.
-- **Thumbnails** tab — image prompt → URL, copy into an ImageLabel/Decal.
-- **Focused Code** tab — generate Script/LocalScript/ModuleScript directly into a chosen service.
-- **GUI** tab — describe a menu, get a LocalScript that builds it (DevAI gold-brown theme).
-- **Animations** tab — rigged Meshy models + AnimationController script.
-- **Debug** — scans the Output window for the last error/Exception and feeds it to the LLM with project context.
-- **Settings** — API keys, model preset picker, project memory (game name, currency, UI, admin, extra instructions). Keys live in `plugin:SetSetting/GetSetting` only.
-
-### Plugin v1.2 changes (vs v1.1)
-- Added **🦴 Rig Character** flow on the 3D tab: auto-skeletons a Meshy model and exposes walk/run FBX downloads.
-- Result card resized to show rigged GLB/FBX plus walk/run links.
-- New Meshy API helpers: `Meshy.rigFromTask`, `Meshy.getRigTask`, `Meshy.pollRig`.
-
----
-
-## 🛠 Development pipeline (the DevAI loop)
-
-`BUILD → CODE → DEBUG → TEST → OPTIMIZE → DEPLOY`
-
-Every response respects this loop. Ask DevAI to scaffold, implement, hunt errors, suggest optimizations, or write deployment checks before publishing.
-
-## 🏰 Default aesthetic
-
-Ancient fantasy rainforest castle — gold, bronze, amber, mossy stone accents. Tell the AI explicitly if you want sci-fi/modern.
-
-## ⚠ Notes
-
-- Keys never leave your machine: web app uses `localStorage`, plugin uses Roblox `plugin:SetSetting`. Calls go straight to the provider APIs from your browser/Studio (no DevAI backend).
-- Roblox Studio's HttpEnabled must be ON (the plugin prompts you when it isn't).
-- Studio plugins cannot write directly to disk, so download buttons copy URLs to the clipboard and print them in the Output window — paste in a browser to save.
+The `docs/` folder is a mirror of `site/` for GitHub Pages.

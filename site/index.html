@@ -3,329 +3,177 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Enes AI — Build Roblox games with AI</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><text y='52' font-size='52'>🐯</text></svg>">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css">
-<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/core.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/lua.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#0a0810;
-  --bg2:#120f1c;
-  --panel:rgba(255,255,255,0.04);
-  --panel2:rgba(255,255,255,0.07);
-  --border:rgba(255,255,255,0.08);
-  --tiger:#ff8c00;
-  --tiger-glow:rgba(255,140,0,0.15);
-  --purple:#a855f7;
-  --pink:#ec4899;
-  --green:#22c55e;
-  --red:#ef4444;
-  --amber:#f59e0b;
-  --blue:#3b82f6;
-  --text:#f5f3ff;
-  --dim:#a39bb8;
-  --muted:#6b6480;
-  --faint:rgba(255,255,255,0.04);
-  --mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
-  --font:-apple-system,BlinkMacSystemFont,'SF Pro Display','Inter','Segoe UI',Roboto,sans-serif;
-}
-html,body{height:100%;}
-body{
-  font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;
-  background:radial-gradient(ellipse at 20% 0%,rgba(168,85,247,0.15) 0%,transparent 50%),
-             radial-gradient(ellipse at 80% 100%,rgba(236,72,153,0.10) 0%,transparent 50%),
-             var(--bg);
-  overflow-x:hidden;
-  -webkit-font-smoothing:antialiased;
-}
-button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
-a{color:var(--tiger);text-decoration:none}
-code,pre{font-family:var(--mono)}
-::-webkit-scrollbar{width:6px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:3px}
-
-/* Top bar */
-.topbar{
-  position:sticky;top:0;z-index:10;display:flex;align-items:center;padding:14px 28px;gap:14px;
-  background:rgba(10,8,16,0.7);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);
-}
-.logo{display:flex;align-items:center;gap:10px;font-weight:900;font-size:18px;color:#fff}
-.logo .emoji{font-size:26px}
-.logo span b{color:var(--tiger)}
-.tabs{display:flex;gap:4px;margin-left:32px}
-.tab{padding:8px 16px;border-radius:8px;color:var(--dim);font-weight:600;font-size:13px;transition:.15s}
-.tab:hover{color:var(--text);background:var(--panel)}
-.tab.active{color:var(--text);background:var(--panel2)}
-.top-actions{margin-left:auto;display:flex;align-items:center;gap:10px}
-.pill{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;font-size:12px;font-weight:600;background:var(--panel);border:1px solid var(--border);color:var(--dim)}
-.pill .dot{width:8px;height:8px;border-radius:50%;background:var(--red);flex-shrink:0}
-.pill.on .dot{background:var(--green);box-shadow:0 0 10px var(--green)}
-.btn{padding:8px 16px;border-radius:8px;font-weight:700;font-size:12px;transition:.15s}
-.btn.tiger{background:var(--tiger);color:#000}.btn.tiger:hover{filter:brightness(1.1);box-shadow:0 4px 20px var(--tiger-glow)}
-.btn.ghost{background:var(--panel);color:var(--text);border:1px solid var(--border)}.btn.ghost:hover{border-color:var(--tiger);color:var(--tiger)}
-
-/* Layout */
-.wrap{max-width:820px;margin:0 auto;padding:0 24px 200px;}
-
-/* Hero when no messages */
-.hero{padding:80px 0 40px;text-align:center}
-.hero .big-tiger{font-size:72px;margin-bottom:16px;animation:bob 3s ease-in-out infinite}
-@keyframes bob{0%,100%{transform:translateY(0) rotate(-5deg)}50%{transform:translateY(-10px) rotate(5deg)}}
-.hero h1{font-size:48px;font-weight:900;letter-spacing:-1.5px;line-height:1.1;margin-bottom:12px}
-.hero h1 span{color:var(--tiger)}
-.hero p{color:var(--dim);font-size:17px;max-width:540px;margin:0 auto 30px}
-.quick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:32px}
-.quick{padding:14px;background:var(--panel);border:1px solid var(--border);border-radius:12px;text-align:left;font-size:13px;color:var(--dim);transition:.2s;cursor:pointer}
-.quick:hover{border-color:var(--tiger);background:var(--panel2);color:var(--text);transform:translateY(-2px)}
-.quick .g{font-size:22px;margin-bottom:6px;display:block}
-
-/* Chat */
-#messages{padding-top:40px;display:flex;flex-direction:column;gap:24px}
-.msg-ai{display:flex;gap:14px;align-items:flex-start}
-.msg-user{display:flex;justify-content:flex-end}
-.ava{width:34px;height:34px;border-radius:10px;flex-shrink:0;display:grid;place-items:center;font-size:18px;background:linear-gradient(135deg,#ff8c00,#ff2d00);}
-.msg-user .bubble{background:var(--tiger);color:#000;border-radius:18px 18px 4px 18px;padding:12px 18px;max-width:75%;font-weight:500}
-.msg-ai .bubble{flex:1;min-width:0}
-.ai-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px}
-.ai-name{font-weight:800;color:#fff}.ai-provider{color:var(--muted)}.ai-best{color:var(--dim);font-size:12px;margin-left:4px}
-.ai-why{margin-left:auto;font-size:11px;padding:3px 10px;border-radius:6px;background:var(--tiger-glow);color:var(--tiger);font-weight:600}
-.bubble .content{font-size:14.5px;line-height:1.7;color:var(--text)}
-.content p{margin-bottom:12px}.content p:last-child{margin-bottom:0}
-.content ul,.content ol{padding-left:24px;margin-bottom:12px}.content li{margin-bottom:4px}
-.content strong{color:var(--tiger);font-weight:700}
-.content h1,.content h2,.content h3{margin:16px 0 8px;font-weight:800}
-.content h2{font-size:18px}
-
-/* Code blocks */
-.code{margin:14px 0;background:#06040d;border:1px solid var(--border);border-radius:12px;overflow:hidden}
-.code-head{display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border);font-size:12px}
-.code-lang{font-weight:800;color:var(--tiger);font-family:var(--mono);font-size:11px}
-.code-path{font-family:var(--mono);color:var(--dim);font-size:11px;flex:1}
-.code-acts{display:flex;gap:6px}
-.code-act{padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;background:var(--panel2);color:var(--text);border:1px solid var(--border);cursor:pointer}
-.code-act:hover{border-color:var(--tiger);color:var(--tiger)}
-.code-act.send{background:var(--tiger);color:#000;border-color:var(--tiger)}
-.code pre{padding:14px;overflow-x:auto;font-size:12.5px;line-height:1.6}
-.code pre code{color:#e2d8ff}
-.inline{background:rgba(255,140,0,0.08);padding:2px 7px;border-radius:5px;color:var(--tiger);font-family:var(--mono);font-size:12.5px;border:1px solid rgba(255,140,0,0.2)}
-.msg-user .inline{background:rgba(0,0,0,0.1);color:#000;border-color:rgba(0,0,0,0.1)}
-
-/* Plan card */
-.plan{background:linear-gradient(135deg,rgba(255,140,0,0.08),rgba(168,85,247,0.08));border:1px solid var(--tiger);border-radius:12px;padding:16px;margin:12px 0}
-.plan h4{color:var(--tiger);font-size:12px;font-weight:800;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px}
-.plan ol{list-style:none;counter-reset:s;padding-left:0;margin-bottom:12px}
-.plan ol li{counter-increment:s;padding:8px 0 8px 32px;position:relative;border-bottom:1px solid var(--border);font-size:13px;color:var(--dim)}
-.plan ol li:last-child{border-bottom:none}
-.plan ol li::before{content:counter(s);position:absolute;left:0;top:8px;width:22px;height:22px;border-radius:50%;background:var(--tiger);color:#000;font-weight:900;font-size:11px;display:grid;place-items:center}
-.plan-acts{display:flex;gap:8px}
-
-/* Input (stuck bottom) */
-.input-shell{position:fixed;bottom:0;left:0;right:0;padding:16px 24px 20px;background:linear-gradient(to top,var(--bg) 60%,transparent);z-index:20;}
-.input-wrap{max-width:820px;margin:0 auto}
-.input-card{
-  background:var(--panel);border:1px solid var(--border);border-radius:18px;
-  padding:10px 10px 10px 18px;transition:.2s;backdrop-filter:blur(16px);
-  display:flex;align-items:flex-end;gap:10px;
-}
-.input-card:focus-within{border-color:var(--tiger);box-shadow:0 0 0 4px var(--tiger-glow)}
-.input-card textarea{
-  flex:1;background:transparent;border:none;color:var(--text);resize:none;min-height:24px;max-height:200px;
-  outline:none;font-size:15px;line-height:1.5;font-family:inherit;padding:8px 0;
-}
-.input-card textarea::placeholder{color:var(--muted)}
-.input-tools{display:flex;gap:4px;padding-top:4px}
-.ibtn{padding:8px;border-radius:10px;color:var(--dim);font-size:16px;transition:.1s}.ibtn:hover{background:var(--panel2);color:var(--text)}
-.gen-btn{
-  width:42px;height:42px;border-radius:12px;background:var(--tiger);color:#000;display:grid;place-items:center;
-  font-weight:900;font-size:18px;cursor:pointer;transition:.15s;flex-shrink:0;
-}
-.gen-btn:hover{transform:scale(1.05);box-shadow:0 4px 20px var(--tiger-glow)}
-.gen-btn:disabled{background:var(--panel2);color:var(--muted);cursor:not-allowed;transform:none;box-shadow:none}
-.input-row{display:flex;align-items:center;gap:8px;padding-top:8px;padding-left:4px}
-.model-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:var(--panel);border:1px solid var(--border);font-size:12px;color:var(--dim);cursor:pointer;transition:.1s;position:relative}
-.model-btn:hover{border-color:var(--tiger);color:var(--tiger)}
-.model-btn .d{width:6px;height:6px;border-radius:50%;background:var(--tiger)}
-.input-hint{text-align:center;font-size:11px;color:var(--muted);margin-top:8px}
-
-/* Model picker dropdown */
-.picker{position:absolute;bottom:60px;left:0;background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:10px;width:360px;max-height:500px;overflow-y:auto;box-shadow:0 30px 80px rgba(0,0,0,0.6);display:none;z-index:50}
-.picker.open{display:block}
-.picker h5{font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:6px 10px}
-.pick-item{padding:10px 12px;border-radius:10px;cursor:pointer;display:flex;gap:10px;align-items:flex-start;transition:.1s}
-.pick-item:hover{background:var(--panel)}.pick-item.sel{background:var(--tiger-glow);border:1px solid var(--tiger)}
-.pick-icon{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font-size:15px;flex-shrink:0}
-.pick-body{flex:1;min-width:0}.pick-body h6{font-size:13px;font-weight:700;color:#fff;margin-bottom:2px;display:flex;align-items:center;gap:6px}
-.pick-body p{font-size:11px;color:var(--dim);line-height:1.4}
-.pick-badge{font-size:9px;padding:2px 6px;border-radius:4px;font-weight:700}
-.pick-badge.ready{background:rgba(34,197,94,0.15);color:var(--green)}
-.pick-badge.nokey{background:rgba(239,68,68,0.1);color:var(--red)}
-
-/* Modal */
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(8px)}
-.modal-bg.open{display:flex}
-.modal{background:var(--bg2);border:1px solid var(--border);border-radius:16px;max-width:780px;width:100%;max-height:85vh;overflow:hidden;display:flex;flex-direction:column}
-.modal-head{padding:18px;display:flex;align-items:center;border-bottom:1px solid var(--border)}
-.modal-head h3{font-size:16px;font-weight:800;flex:1;color:var(--amber)}
-.modal-close{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;color:var(--muted);cursor:pointer;font-size:18px}
-.modal-body{padding:20px;overflow-y:auto}
-.diff-box{background:#06040d;border:1px solid var(--border);border-radius:10px;padding:14px;font-family:var(--mono);font-size:12px;max-height:300px;overflow:auto;white-space:pre-wrap}
-.add{color:var(--green);display:block}.del{color:var(--red);display:block;text-decoration:line-through;text-decoration-color:rgba(239,68,68,0.4)}
-.ctx{color:var(--muted);display:block}
-.modal-actions{padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end}
-.btn-primary{padding:10px 20px;background:var(--tiger);color:#000;border-radius:10px;font-weight:800;cursor:pointer}
-.btn-ghost{padding:10px 20px;background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:10px;font-weight:700;cursor:pointer}
-.btn-danger{padding:10px 20px;background:var(--red);color:#fff;border-radius:10px;font-weight:800;cursor:pointer}
-
-/* Settings page overlay */
-.page-overlay{display:none;position:fixed;inset:0;z-index:40;background:var(--bg);padding:40px 24px;overflow-y:auto}
-.page-overlay.open{display:block}
-.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:14px;max-width:720px;margin-left:auto;margin-right:auto}
-.card h3{font-size:15px;font-weight:800;margin-bottom:8px;color:var(--tiger);display:flex;align-items:center;gap:8px}
-.card p{color:var(--dim);font-size:12px;margin-bottom:14px}
-.kv{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px}
-.kv:last-child{border-bottom:none}
-.kv label{flex:1;color:var(--dim)}
-.kv input{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;flex:1;min-width:200px;font-family:var(--mono)}
-.kv input:focus{outline:none;border-color:var(--tiger)}
-
-.toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--bg2);border:1px solid var(--border);padding:12px 20px;border-radius:10px;font-size:13px;color:#fff;z-index:1000;transition:.3s;box-shadow:0 20px 60px rgba(0,0,0,0.6);opacity:0;pointer-events:none}
-.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
-.toast.ok{border-color:var(--green)}.toast.err{border-color:var(--red)}
-
-.backend-err{position:fixed;top:80px;left:50%;transform:translateX(-50%);background:rgba(239,68,68,0.15);border:1px solid var(--red);color:var(--red);padding:12px 20px;border-radius:10px;font-size:13px;z-index:200;display:none;max-width:500px;text-align:center}
-.backend-err.show{display:block}
-
-@media(max-width:768px){.hero h1{font-size:34px}.wrap{padding:0 16px 180px}.input-shell{padding:12px}.quick-grid{grid-template-columns:1fr 1fr}}
-</style>
+<title>⚔ DevAI — Roblox AI Co-Developer</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><text y='54' font-size='52'>⚔</text></svg>">
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
-
-<div class="backend-err" id="backendErr"></div>
-
-<div class="topbar">
-  <div class="logo"><span class="emoji">🐯</span><span><b>🐯 Enes AI</b></span></div>
-  <div class="tabs">
-    <button class="tab active" data-page="chat" onclick="showPage('chat')">Chat</button>
-    <button class="tab" data-page="studio" onclick="showPage('studio')">Studio</button>
-    <button class="tab" data-page="history" onclick="showPage('history')">History</button>
-  </div>
-  <div class="top-actions">
-    <span class="pill" id="studioPill"><span class="dot"></span>Studio</span>
-    <span class="pill" id="backendPill"><span class="dot"></span>Backend</span>
-    <button class="btn ghost" onclick="toggleSettings()">⚙️</button>
-  </div>
-</div>
-
-<!-- CHAT PAGE -->
-<div class="wrap" id="page-chat">
-  <div id="messages"></div>
-  <div class="hero" id="hero">
-    <div class="big-tiger">🐯</div>
-    <h1>Build the <span>game</span><br>only you can imagine</h1>
-    <p>Describe your Roblox game in plain English. Enes AI writes the code and drops it straight into Studio.</p>
-    <div class="quick-grid">
-      <button class="quick" onclick="useQuick('Create a coin collection system that saves player coins.')"><span class="g">🪙</span>Coin system</button>
-      <button class="quick" onclick="useQuick('Create a sword that deals damage and has a cooldown.')"><span class="g">⚔️</span>Sword combat</button>
-      <button class="quick" onclick="useQuick('Create a round-based PvP system with intermission.')"><span class="g">🎯</span>Round system</button>
-      <button class="quick" onclick="useQuick('Create a pet follow system with Datastore saving.')"><span class="g">🐾</span>Pet system</button>
-      <button class="quick" onclick="useQuick('Create an admin panel with kick/ban/give commands.')"><span class="g">🛡️</span>Admin commands</button>
-      <button class="quick" onclick="useQuick('Create a tycoon with droppers, buttons, and upgrades.')"><span class="g">🏭</span>Tycoon</button>
+<div id="app">
+  <header class="topbar">
+    <div class="logo">⚔ <span><b>Dev</b>AI</span></div>
+    <nav class="tabs">
+      <button class="tab active" data-tab="chat">💬 Chat</button>
+      <button class="tab" data-tab="models3d">🧊 3D Models</button>
+      <button class="tab" data-tab="thumb">🖼 Thumbnails</button>
+      <button class="tab" data-tab="code">📜 Luau Code</button>
+      <button class="tab" data-tab="gui">🎨 GUI</button>
+      <button class="tab" data-tab="anim">💃 Animations</button>
+    </nav>
+    <div class="right">
+      <span class="pill" id="bridgePill"><span class="dot"></span>Studio</span>
+      <button class="icon-btn" id="syncBtn" title="Studio Sync">🔗</button>
+      <button class="icon-btn" id="settingsBtn" title="Settings">⚙</button>
     </div>
-  </div>
-</div>
+  </header>
 
-<!-- STUDIO PAGE -->
-<div class="page-overlay" id="page-studio">
-  <button style="position:absolute;top:20px;right:20px" class="btn ghost" onclick="showPage('chat')">✕ Close</button>
-  <div class="wrap" style="padding-top:60px">
-    <h1 style="font-size:32px;font-weight:900;margin-bottom:6px">🔌 Connect Roblox Studio</h1>
-    <p style="color:var(--dim);margin-bottom:28px">Pair Studio using a one-time code. API keys never leave your machine.</p>
-    <div class="card" style="padding:30px;text-align:center">
-      <h3 style="justify-content:center">PAIRING CODE</h3>
-      <div id="pairCode" style="font-family:var(--mono);font-size:56px;font-weight:900;letter-spacing:10px;color:var(--tiger);background:#06040d;padding:28px;border-radius:14px;border:2px dashed var(--border);margin:18px 0;user-select:all">----</div>
-      <button class="btn tiger" onclick="genPairCode()">🔄 Generate New Code</button>
-      <p style="color:var(--muted);font-size:12px;margin-top:14px">Paste this code into the Enes AI plugin panel inside Studio. Expires in 5 minutes.</p>
-    </div>
-    <div class="card"><h3>📥 Downloads</h3><p>Extract and double-click start-devai.bat. It installs the plugin and starts the local backend.</p>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <button class="btn tiger" onclick="downloadZip()">⬇ EnesAI-v9.zip</button>
-        <button class="btn ghost" onclick="downloadBat()">⬇ start-devai.bat</button>
-      </div></div>
-    <div class="card"><h3>🔧 Manual Commands</h3>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <button class="btn ghost" onclick="sendAction({op:'get_project_tree'})">🌳 Sync Project Tree</button>
-        <button class="btn ghost" onclick="sendAction({op:'get_selection'})">👆 Send Selection</button>
-        <button class="btn ghost" onclick="sendAction({op:'get_script'})">📄 Send Selected Script</button>
-        <button class="btn ghost" onclick="sendAction({op:'scan_project'})">🔍 Scan Project</button>
-        <button class="btn ghost" onclick="sendAction({op:'get_output'})">📟 Start Output Stream</button>
-      </div></div>
-  </div>
-</div>
+  <main id="main">
 
-<!-- HISTORY PAGE -->
-<div class="page-overlay" id="page-history">
-  <button style="position:absolute;top:20px;right:20px" class="btn ghost" onclick="showPage('chat')">✕ Close</button>
-  <div class="wrap" style="padding-top:60px">
-    <h1 style="font-size:32px;font-weight:900;margin-bottom:20px">🕐 History</h1>
-    <div id="historyList"></div>
-  </div>
-</div>
-
-<!-- SETTINGS -->
-<div class="page-overlay" id="page-settings">
-  <button style="position:absolute;top:20px;right:20px" class="btn ghost" onclick="toggleSettings()">✕ Close</button>
-  <div class="wrap" style="padding-top:60px">
-    <h1 style="font-size:32px;font-weight:900;margin-bottom:6px">⚙️ Settings</h1>
-    <p style="color:var(--dim);margin-bottom:24px">Keys are stored on your local backend only — never sent to your browser or plugin.</p>
-    <div class="card">
-      <h3>🔑 AI Provider Keys</h3>
-      <p>Add at least one key to use real AI. Without a key Enes AI gives starter templates.</p>
-      <div id="keyList"></div>
-      <div style="margin-top:14px;display:flex;gap:8px"><button class="btn tiger" onclick="saveKeys()">💾 Save Keys</button></div>
-    </div>
-    <div class="card"><h3>🛡 Safety</h3>
-      <div class="kv"><label>Confirm before modifying existing scripts</label><input type="checkbox" id="setConfirm" checked style="width:20px;height:20px;accent-color:var(--tiger)"></div>
-    </div>
-    <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:30px">Enes AI v28 · Lemonade-style · Local backend · Local-first</div>
-  </div>
-</div>
-
-<!-- DIFF MODAL -->
-<div class="modal-bg" id="diffModal">
-  <div class="modal">
-    <div class="modal-head"><h3 id="diffTitle">⚠ Preview Action</h3><button class="modal-close" onclick="closeDiff()">✕</button></div>
-    <div class="modal-body"><div id="diffMeta" style="margin-bottom:10px;font-size:13px"></div><div class="diff-box" id="diffBox"></div></div>
-    <div class="modal-actions">
-      <button class="btn-ghost" onclick="closeDiff()">Cancel</button>
-      <button class="btn-danger" id="diffReject">Reject</button>
-      <button class="btn-primary" id="diffApply">Apply</button>
-    </div>
-  </div>
-</div>
-
-<!-- INPUT -->
-<div class="input-shell">
-  <div class="input-wrap">
-    <div class="input-card">
-      <textarea id="userInput" rows="1" placeholder="Describe the game or script you want to build…" onkeydown="onKey(event)" oninput="autoGrow(this)"></textarea>
-      <div class="input-tools" style="flex-direction:column;gap:4px">
-        <button class="ibtn" title="Stop" id="stopBtn" style="display:none" onclick="stopGen()">⏹</button>
-        <button class="gen-btn" id="sendBtn" onclick="sendMsg()" title="Send (Enter)">➤</button>
+    <!-- CHAT TAB -->
+    <section id="tab-chat" class="tab-pane active">
+      <div class="hero">
+        <div class="sword">⚔</div>
+        <h1>Build the kingdom <span>only you can imagine</span></h1>
+        <p class="sub">Ancient-fantasy Roblox co-developer. Code, worlds, characters, animation — from scroll to Studio in one click.</p>
       </div>
-    </div>
-    <div class="input-row">
-      <button class="model-btn" onclick="togglePicker()"><span class="d"></span><span id="modelPill">🐯 Enes AI</span> ▾
-        <div class="picker" id="picker"></div>
-      </button>
-    </div>
-    <div class="input-hint">Keys stay on your local backend · Enter to send · Shift+Enter for newline</div>
+      <div id="chat-messages" class="chat"></div>
+      <div class="quick-row">
+        <button class="quick" data-prompt="Design a coin collection system with leaderstats and pickup visuals.">🪙 Coin System</button>
+        <button class="quick" data-prompt="Make a sword tool that does damage with cooldown and knockback.">⚔ Sword Combat</button>
+        <button class="quick" data-prompt="Create a round-based battle arena with intermission and winner detection.">🛡 Round System</button>
+        <button class="quick" data-prompt="Build a follow pet that lerps behind the player with bobbing animation.">🐾 Pet Companion</button>
+        <button class="quick" data-prompt="Create admin chat commands (/kill, /bring, /kick, /ff, /speed).">👑 Admin Commands</button>
+        <button class="quick" data-prompt="Build a tycoon with droppers, collectors, and cash leaderstats.">🏰 Tycoon</button>
+      </div>
+      <div class="composer">
+        <textarea id="chat-input" placeholder="Speak, builder — what shall we forge today?" rows="2"></textarea>
+        <button id="chat-send" class="btn-primary">⚔ Forge</button>
+      </div>
+    </section>
+
+    <!-- 3D MODELS TAB -->
+    <section id="tab-models3d" class="tab-pane">
+      <div class="panel">
+        <h2>🧊 Text → 3D Model (Meshy)</h2>
+        <p class="muted">Describe a 3D object (weapon, character, prop). Meshy generates GLB/FBX you can download and import into Studio.</p>
+        <div class="row"><input id="m3d-prompt" placeholder="e.g. ancient bronze broadsword with rune engravings" style="flex:1"><select id="m3d-mode"><option value="preview">Preview (fast)</option><option value="refine">Refine (high quality)</option></select><button id="m3d-gen" class="btn-primary">Generate</button></div>
+        <div id="m3d-results" class="results"></div>
+      </div>
+    </section>
+
+    <!-- THUMBNAILS TAB -->
+    <section id="tab-thumb" class="tab-pane">
+      <div class="panel">
+        <h2>🖼 Thumbnails & Icons (free, no key)</h2>
+        <p class="muted">Generate game icons, decals, thumbnails via Pollinations. Right-click → Save, then drop into Studio.</p>
+        <div class="row"><input id="thumb-prompt" placeholder="ancient fantasy castle, golden hour, epic" style="flex:1"><input id="thumb-seed" type="number" placeholder="seed" style="width:100px"><button id="thumb-gen" class="btn-primary">Generate</button></div>
+        <div id="thumb-results" class="thumb-grid"></div>
+      </div>
+    </section>
+
+    <!-- CODE TAB -->
+    <section id="tab-code" class="tab-pane">
+      <div class="panel">
+        <h2>📜 Targeted Luau Generator</h2>
+        <p class="muted">Generate a script targeted to a specific service path. One click sends to Studio.</p>
+        <div class="grid2">
+          <label>Script type
+            <select id="code-type"><option>Script</option><option>LocalScript</option><option>ModuleScript</option></select>
+          </label>
+          <label>Parent path
+            <input id="code-parent" placeholder="ServerScriptService.CombatSystem">
+          </label>
+          <label class="full">What should it do?
+            <textarea id="code-desc" rows="3" placeholder="A sword combat system with 3-hit combo..."></textarea>
+          </label>
+        </div>
+        <button id="code-gen" class="btn-primary">⚔ Generate & Insert</button>
+        <div id="code-results" class="results"></div>
+      </div>
+    </section>
+
+    <!-- GUI TAB -->
+    <section id="tab-gui" class="tab-pane">
+      <div class="panel">
+        <h2>🎨 GUI Generator</h2>
+        <p class="muted">Describe a menu/HUD/shop/Inventory → get a LocalScript that builds it with the DevAI gold/bronze theme.</p>
+        <div class="row"><input id="gui-desc" placeholder="Main menu with Play, Settings, Credits buttons" style="flex:1"><button id="gui-gen" class="btn-primary">Generate GUI</button></div>
+        <div id="gui-results" class="results"></div>
+      </div>
+    </section>
+
+    <!-- ANIMATIONS TAB -->
+    <section id="tab-anim" class="tab-pane">
+      <div class="panel">
+        <h2>💃 Animation Controller</h2>
+        <p class="muted">Generate an AnimationController LocalScript for a rigged Meshy character. Paste the animation IDs below.</p>
+        <div class="grid2">
+          <label>Character path <input id="anim-path" placeholder="StarterPlayerScripts.CharacterAnim"></label>
+          <label>Walk ID <input id="anim-walk" placeholder="rbxassetid://..."></label>
+          <label>Idle ID <input id="anim-idle" placeholder="rbxassetid://..."></label>
+          <label>Run/Jump ID <input id="anim-run" placeholder="rbxassetid://..."></label>
+        </div>
+        <button id="anim-gen" class="btn-primary">Generate Controller</button>
+        <div id="anim-results" class="results"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- SYNC MODAL -->
+<div id="syncModal" class="modal">
+  <div class="modal-card">
+    <h3>🔗 Studio Sync</h3>
+    <p class="muted">Paste this 6-character code into the DevAI plugin panel in Roblox Studio to pair:</p>
+    <div id="syncCode" class="sync-code">------</div>
+    <div class="row"><button id="syncGen" class="btn-primary">Generate New Code</button><button class="btn-ghost" onclick="closeModal('syncModal')">Close</button></div>
+    <p class="tiny">Or start the bridge with <code>start-devai.bat</code> for direct local sync without codes.</p>
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<!-- SETTINGS MODAL -->
+<div id="settingsModal" class="modal">
+  <div class="modal-card wide">
+    <h3>⚙ Settings</h3>
+    <p class="muted">Keys stay in your browser (localStorage) — DevAI never sees them. Calls go straight to the provider.</p>
+    <div class="keys">
+      <label>Model preset
+        <select id="key-preset">
+          <option value="openrouter-free">OpenRouter Free (Llama 3.1 8B — 100% free)</option>
+          <option value="claude">Claude Sonnet (Anthropic key)</option>
+          <option value="gpt4o-mini">GPT-4o Mini (OpenAI key)</option>
+          <option value="gpt4o">GPT-4o (OpenAI key)</option>
+          <option value="groq">Groq Llama 3.1 70B (free key)</option>
+          <option value="ollama">Ollama (local)</option>
+          <option value="custom">Custom endpoint</option>
+        </select>
+      </label>
+      <label>OpenRouter key (free tier) <input id="key-openrouter" type="password" placeholder="sk-or-..."></label>
+      <label>Anthropic key <input id="key-anthropic" type="password" placeholder="sk-ant-..."></label>
+      <label>OpenAI key <input id="key-openai" type="password" placeholder="sk-..."></label>
+      <label>Groq key (free!) <input id="key-groq" type="password" placeholder="gsk_..."></label>
+      <label>Meshy key (3D models — 200 free credits/mo) <input id="key-meshy" type="password" placeholder="msy_..."></label>
+      <label>Custom endpoint URL <input id="key-custom" placeholder="https://api.example.com/v1/chat/completions"></label>
+      <label>Custom model name <input id="key-custom-model" placeholder="model-name"></label>
+      <label>Custom API key <input id="key-custom-key" type="password"></label>
+    </div>
+    <div class="divider"></div>
+    <h4>Project memory (sent with every prompt)</h4>
+    <div class="keys">
+      <label>Game name <input id="proj-name" placeholder="My castle defense game"></label>
+      <label>Currency <input id="proj-currency" placeholder="Gold"></label>
+      <label>UI theme <input id="proj-ui" placeholder="Ancient fantasy gold/bronze"></label>
+      <label>Admins (comma-separated Roblox usernames) <input id="proj-admins" placeholder="YourName"></label>
+      <label class="full">Extra instructions <textarea id="proj-extra" rows="2" placeholder="e.g. Always add admin commands for me; use CollectionService for pickups"></textarea></label>
+    </div>
+    <div class="row end"><button id="saveSettings" class="btn-primary">💾 Save</button><button class="btn-ghost" onclick="closeModal('settingsModal')">Cancel</button></div>
+  </div>
+</div>
 
-<script src="app.js?v=30"></script>
+<div id="toast" class="toast"></div>
+
+<!-- model-viewer for 3D preview (loaded on demand) -->
+<script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
