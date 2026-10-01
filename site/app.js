@@ -1,8 +1,8 @@
-const APP_VERSION = 29;
+const APP_VERSION = 31;
 
 let ws=null, connected=false, studioConnected=false;
 let state = {
-  model:localStorage.getItem('devai_model')||'auto',
+  model:localStorage.getItem('devai_model')||'enes',
   conv:{id:'c1',title:'New Chat',messages:[]},
   history:[],
   models:[],
@@ -33,28 +33,39 @@ function connectWS(){
   }catch(e){setBackend(false);setTimeout(connectWS,2000);}
 }
 function wsSend(o){if(ws&&ws.readyState===1)ws.send(JSON.stringify(o));}
+// Use relative URLs first (works on preview/proxied local); fall back to 127.0.0.1 (direct localhost).
+const API_BASE = (location.protocol==='http:' && location.hostname!=='localhost' && location.hostname!=='127.0.0.1')
+  ? '' : (location.hostname==='localhost'||location.hostname==='127.0.0.1' ? '' : 'http://127.0.0.1:42069');
+let backendTries=0;
 function checkHealth(){
-  fetch('http://127.0.0.1:42069/api/health').then(r=>r.json()).then(j=>{setBackend(true);setStudioConn(!!j.connected);}).catch(()=>setBackend(false));
-  fetch('http://127.0.0.1:42069/api/models').then(r=>r.json()).then(j=>{
+  function applyModels(j){
     if(j.models&&j.models.length){state.models=j.models;renderPicker();renderKeyList();}
-  }).catch(()=>{
-    // Fallback: even if backend is down show all models so UI isn't empty
-    state.models=state.models.length?state.models:[
-      {id:'auto',name:'Auto',provider:'DevAI',best:'Picks the best model for your task',configured:true},
-      {id:'claude-sonnet',name:'Claude Sonnet',provider:'Anthropic',best:'Complex Roblox coding, architecture, debugging',configured:false},
-      {id:'gpt-4o',name:'GPT-4o',provider:'OpenAI',best:'General coding, Roblox systems, explanations',configured:false},
-      {id:'gpt-4o-mini',name:'GPT-4o Mini',provider:'OpenAI',best:'Fast responses, small scripts',configured:false},
-      {id:'gemini-pro',name:'Gemini Pro',provider:'Google',best:'Large context, multimodal',configured:false},
-      {id:'deepseek',name:'DeepSeek Coder',provider:'DeepSeek',best:'Coding & technical reasoning (free key)',configured:false},
-      {id:'groq-llm',name:'Llama 3.1 70B (Groq)',provider:'Groq',best:'Extremely fast responses (free key)',configured:false},
-    ];
-    renderPicker();renderKeyList();
+  }
+  // Always populate with full model list first so UI never looks empty
+  state.models=[
+    {id:'enes',name:'🐯 Enes AI',provider:'TigerCoder',best:'🏆 BEST — Your personal Roblox AI. Coding, scripting, debugging, full games',icon:'🐯',flagship:true,configured:true},
+    {id:'auto',name:'Auto',provider:'Router',best:'Picks the smartest available model',icon:'🤖',configured:true},
+    {id:'claude-sonnet',name:'Claude Sonnet',provider:'Anthropic',best:'Complex Roblox architecture & debugging',icon:'🟠',configured:false},
+    {id:'gpt-4o',name:'GPT-4o',provider:'OpenAI',best:'General coding, systems, explanations',icon:'🟢',configured:false},
+    {id:'gpt-4o-mini',name:'GPT-4o Mini',provider:'OpenAI',best:'Ultra-fast small scripts',icon:'🟢',configured:false},
+    {id:'gemini-pro',name:'Gemini Pro',provider:'Google',best:'Huge context, whole-project',icon:'🔵',configured:false},
+    {id:'deepseek',name:'DeepSeek Coder',provider:'DeepSeek',best:'Code specialist — FREE key at platform.deepseek.com',icon:'🟣',configured:false},
+    {id:'groq-llm',name:'Llama 3.1 70B',provider:'Groq',best:'FASTEST responses — FREE key at console.groq.com',icon:'🔴',configured:false},
+  ];
+  renderPicker();
+  // Try relative then 127.0.0.1
+  Promise.all([
+    fetch(API_BASE+'/api/health').then(r=>r.json()).then(j=>{setBackend(true);setStudioConn(!!j.connected);return fetch(API_BASE+'/api/models').then(r=>r.json()).then(applyModels);}).catch(()=>null),
+    fetch('http://127.0.0.1:42069/api/health').then(r=>r.json()).then(j=>{setBackend(true);setStudioConn(!!j.connected);return fetch('http://127.0.0.1:42069/api/models').then(r=>r.json()).then(applyModels);}).catch(()=>null),
+  ]).then(results=>{
+    if(!results.some(x=>x)){backendTries++;setBackend(false);renderKeyList();}
+    else backendTries=0;
   });
 }
 
 function handle(m){
   switch(m.type){
-    case 'hello': toast('Connected to DevAI backend v'+m.version,'ok'); break;
+    case 'hello': toast('Connected to Enes AI backend v'+m.version,'ok'); break;
     case 'studio_status': setStudioConn(m.connected); break;
     case 'pair_code':
       document.getElementById('pairCode').textContent=m.code;
@@ -116,9 +127,9 @@ function renderM(m){
   if(m.role==='user'){
     const b=document.createElement('div');b.className='bubble';b.textContent=m.text;w.appendChild(b);return w;
   }
-  const av=document.createElement('div');av.className='ava';av.textContent='🍋';w.appendChild(av);
+  const av=document.createElement('div');av.className='ava';av.textContent='🐯';w.appendChild(av);
   const b=document.createElement('div');b.className='bubble';
-  const model=state.models.find(x=>x.id===m.model)||{name:m.modelName||'DevAI',provider:'',best:''};
+  const model=state.models.find(x=>x.id===m.model)||{name:m.modelName||'Enes AI',provider:'',best:''};
   const head=document.createElement('div');head.className='ai-head';
   head.innerHTML=`<span class="ai-name">${model.name}</span>`+
     (model.provider?`<span class="ai-provider">· ${model.provider}</span>`:'')+
@@ -208,7 +219,7 @@ function copyBlock(btn){const b=btn.closest('.code');navigator.clipboard.writeTe
 function previewBlock(btn){
   const b=btn.closest('.code');const code=decodeURIComponent(b.dataset.code);
   document.getElementById('diffTitle').textContent='👁 Preview Code';
-  document.getElementById('diffMeta').innerHTML=`<span style="color:var(--lemon);font-family:var(--mono)">${b.dataset.path||'(no location)'}</span>`;
+  document.getElementById('diffMeta').innerHTML=`<span style="color:var(--tiger);font-family:var(--mono)">${b.dataset.path||'(no location)'}</span>`;
   document.getElementById('diffBox').textContent=code;
   document.getElementById('diffApply').style.display='none';document.getElementById('diffReject').textContent='Close';
   document.getElementById('diffReject').onclick=closeDiff;document.getElementById('diffApply').onclick=null;
@@ -216,7 +227,7 @@ function previewBlock(btn){
 }
 function showDiff(title,meta,apply,reject){
   document.getElementById('diffTitle').innerHTML='⚠ '+title;
-  document.getElementById('diffMeta').innerHTML=`<b>${meta.op||'create_instance'}</b> · <span style="color:var(--lemon);font-family:var(--mono)">${meta.path}</span> <span style="color:var(--muted)">(${meta.type})</span>`;
+  document.getElementById('diffMeta').innerHTML=`<b>${meta.op||'create_instance'}</b> · <span style="color:var(--tiger);font-family:var(--mono)">${meta.path}</span> <span style="color:var(--muted)">(${meta.type})</span>`;
   document.getElementById('diffBox').innerHTML=meta.code.split('\n').map(l=>`<span class="add">+ ${esc(l)}</span>`).join('');
   document.getElementById('diffApply').style.display='';document.getElementById('diffApply').textContent='Apply';
   document.getElementById('diffReject').style.display='';document.getElementById('diffReject').textContent='Cancel';
@@ -273,20 +284,25 @@ function appendOutput(line){
 
 /* MODELS / PICKER */
 function renderPicker(){
-  const pk=document.getElementById('picker');if(!pk||!state.models.length)return;
-  pk.innerHTML='<h5>Select Model</h5>'+state.models.map(m=>{
+  const pk=document.getElementById('picker');if(!pk)return;
+  pk.innerHTML='<h5>🐯 Select your AI</h5>'+state.models.map(m=>{
     const cfg=m.configured!==false;
-    const colors={'auto':'var(--lemon)','claude-sonnet':'#d4a27f','gpt-4o':'#74aa9c','gpt-4o-mini':'#74aa9c','gemini-pro':'#4285f4','deepseek':'#6366f1','groq-llama':'#f55036'};
-    const icons={'auto':'🤖','claude-sonnet':'🟠','gpt-4o':'🟢','gpt-4o-mini':'🟢','gemini-pro':'🔵','deepseek':'🟣','groq-llama':'🔴'};
-    return `<div class="pick-item ${m.id===state.model?'sel':''}" onclick="selectModel('${m.id}')">
-      <div class="pick-icon" style="background:${colors[m.id]||'#888'}22;color:${colors[m.id]||'#fff'}">${icons[m.id]||'🧠'}</div>
+    const colors={'enes':'var(--tiger)','auto':'var(--tiger)','claude-sonnet':'#d4a27f','gpt-4o':'#74aa9c','gpt-4o-mini':'#74aa9c','gemini-pro':'#4285f4','deepseek':'#6366f1','groq-llm':'#f55036'};
+    const icons={'enes':'🐯','auto':'🤖','claude-sonnet':'🟠','gpt-4o':'🟢','gpt-4o-mini':'🟢','gemini-pro':'🔵','deepseek':'🟣','groq-llm':'🔴'};
+    const flag=m.flagship?' <span class="pick-badge ready" style="background:var(--tiger);color:#000">🏆 BEST</span>':'';
+    const itemStyle=m.flagship?' style="border-color:var(--tiger);background:linear-gradient(135deg,rgba(255,140,0,0.1),rgba(26,20,46,0.95))"':'';
+    const iconStyle=m.flagship?'box-shadow:0 0 18px rgba(255,140,0,0.6);font-size:22px':'';
+    const badgeStyle=m.flagship?' style="background:#000;color:var(--tiger);border:1px solid var(--tiger)"':'';
+    const badge=(cfg||m.id==='auto'||m.id==='enes')?'READY':'NO KEY';
+    return `<div class="pick-item ${m.id===state.model?'sel':''}" onclick="selectModel('${m.id}')"${itemStyle}>
+      <div class="pick-icon" style="background:${colors[m.id]||'#888'}33;color:${colors[m.id]||'#fff'};${iconStyle}">${m.icon||icons[m.id]||'🧠'}</div>
       <div class="pick-body">
-        <h6>${m.name} <span class="pick-badge ${cfg?'ready':'nokey'}">${cfg||m.id==='auto'?'READY':'NO KEY'}</span></h6>
-        <p>${m.provider} · ${m.best}</p>
+        <h6>${m.name}${flag} <span class="pick-badge ${cfg?'ready':'nokey'}"${badgeStyle}>${badge}</span></h6>
+        <p><b style="color:var(--muted)">${m.provider}</b> · <span style="color:#b9b0cf">${m.best}</span></p>
       </div></div>`;
-  }).join('');
+  }).join('')+'<div style="padding:10px 4px 2px;font-size:10px;color:var(--dim);border-top:1px solid var(--border);margin-top:8px">🐯 Enes AI works offline with smart templates. Add a free <a href="https://platform.deepseek.com" target="_blank" style="color:var(--tiger)">DeepSeek</a> or <a href="https://console.groq.com" target="_blank" style="color:var(--tiger)">Groq</a> key in ⚙️ for full AI.</div>';
   const cm=state.models.find(x=>x.id===state.model);
-  document.getElementById('modelPill').textContent=cm?cm.name:'Auto';
+  document.getElementById('modelPill').textContent=cm?cm.name:'🐯 Enes AI';
 }
 function selectModel(id){state.model=id;localStorage.setItem('devai_model',id);renderPicker();document.getElementById('picker').classList.remove('open');toast('Model: '+(state.models.find(x=>x.id===id)||{}).name,'ok');}
 function togglePicker(){document.getElementById('picker').classList.toggle('open');}
@@ -327,7 +343,7 @@ function saveKeys(){
 }
 
 /* DOWNLOADS */
-function downloadZip(){const a=document.createElement('a');a.href='DevAI-v7.zip';a.download='DevAI-v7.zip';a.click();}
+function downloadZip(){const a=document.createElement('a');a.href='EnesAI-v9.zip';a.download='EnesAI-v9.zip';a.click();}
 function downloadBat(){const a=document.createElement('a');a.href='start-devai.bat';a.download='start-devai.bat';a.click();}
 
 /* UTILS */
